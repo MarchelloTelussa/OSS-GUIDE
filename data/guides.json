@@ -1,0 +1,23 @@
+[
+  { "id": 1, "title": "Login", "category": "Masuk ke aplikasi" },
+  { "id": 2, "title": "Logout", "category": "Keluar dari aplikasi" },
+  { "id": 3, "title": "Create Team IKR", "category": "Membuat tim IKR" },
+  { "id": 4, "title": "Create Work Order IKR", "category": "Membuat work order IKR" },
+  { "id": 5, "title": "Assign Work Order IKR", "category": "Menugaskan work order IKR" },
+  { "id": 6, "title": "Monitoring IKR", "category": "Memantau pekerjaan IKR" },
+  { "id": 7, "title": "Download Foto IKR", "category": "Mengunduh foto IKR" },
+  { "id": 8, "title": "Create Team Backbone", "category": "Membuat tim Backbone" },
+  { "id": 9, "title": "Create Work Order Backbone", "category": "Membuat work order Backbone" },
+  { "id": 10, "title": "Assign Work Order Backbone", "category": "Menugaskan work order Backbone" },
+  { "id": 11, "title": "Monitoring Backbone", "category": "Memantau pekerjaan Backbone" },
+  { "id": 12, "title": "Download Foto Backbone", "category": "Mengunduh foto Backbone" },
+  { "id": 13, "title": "Create Team Project", "category": "Membuat tim Project" },
+  { "id": 14, "title": "Create Work Order Project", "category": "Membuat work order Project" },
+  { "id": 15, "title": "Assign Work Order Project", "category": "Menugaskan work order Project" },
+  { "id": 16, "title": "Monitoring Project", "category": "Memantau pekerjaan Project" },
+  { "id": 17, "title": "Catat Material Masuk", "category": "Mencatat material masuk" },
+  { "id": 18, "title": "Catat Material Keluar", "category": "Mencatat material keluar" },
+  { "id": 19, "title": "Catat Material Transfer", "category": "Mencatat transfer material" },
+  { "id": 20, "title": "Assign Material ke Teknisi", "category": "Menugaskan material ke teknisi" },
+  { "id": 21, "title": "Memantau Material Collect", "category": "Memantau pengambilan material" }
+]

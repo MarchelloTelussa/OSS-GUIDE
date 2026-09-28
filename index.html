@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSS-Guide</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<style>
+    :root {
+        --black : rgb(0, 0, 0);
+        --white : rgb(255, 255, 255);
+        --lightgrey : rgb(200, 206, 214);
+        --grey : rgb(108, 117, 125);
+        --darkgrey : rgb(71, 85, 105);
+        --blue : rgb(13, 110, 253);
+        --red : rgb(220, 53, 69);
+        --green : rgb(74, 222, 128);
+        --bg : rgb(248, 249, 250);
+    }
+    * {margin: 0; padding: 0; box-sizing: border-box;}
+    body {display: flex; flex-direction: column; min-height: 100vh; font-family: Arial, sans-serif;overflow-y: auto; overflow-behavior: none; background-color: var(--bg);}
+
+    nav {display: flex; flex-direction: row; justify-content: flex-end; align-items: center; width: 100%; min-height: 45px; border-bottom: 2px solid var(--lightgrey); background-color: var(--white); padding: 0px 13px; position:sticky; top: 0;}
+    nav .nav_profile {display: flex; flex-direction: row; justify-content: space-around; gap: 10px;}
+    nav .nav_profile li {list-style: none;}
+    nav .nav_profile li a i{text-decoration: none;}
+
+    main {display: flex; flex-direction: column; align-content: stretch; flex: 1; overflow-y: scroll;}
+
+    main .container_search {display: flex; flex-direction: column; align-items: center; padding: 60px 0px; gap: 30px; background-color: var(--blue); border-radius: 0 0 3% 3%;}
+
+    main .header_search {font-size: 30px; color: var(--white);}
+
+    main .input_search {display: flex; flex-direction: row; justify-content: stretch; align-items: center ; width: 70%; min-height: 10vh; padding: 10px 1% 10px 2.5%; border-radius: 50px; background-color: white;}
+    main .input_search input {width: 80%; height: 100%; border: none; background-color: transparent; font-size: 1rem;}
+    main .input_search input:focus {background-color: transparent; outline: none;}
+    .error-state::placeholder {color: red;}
+
+    main .input_search button {width: 20%; border: none; background-color: transparent; font-size: 1.8rem;}
+    main .input_search button:hover {cursor: pointer; color: var(--blue)}
+
+    main .container_popular {display: flex; flex-direction: column; padding: 35px 50px; gap: 10px;}
+    main .card_popular {display: flex; flex-direction: column; align-items: center;  gap: 20px;}
+    main .card_popular .guide_popular {display: flex; justify-content: space-between; align-items: center; width: 100% ; padding: 20px 15px ; border-radius: 15px; border: 1px solid var(--black); background-color: var(--white);}
+    main .card_popular .guide_popular:hover {padding: 30px 25px; box-shadow: 5px 10px #888888; transition: 0.2s ease-in-out; }
+
+</style>
+</head>
+<body>
+    <nav>
+        <ul class="nav_profile">
+            <li>
+                <a href="guide.html">
+                    <i class="fa-regular fa-circle-question"></i>   
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="fa-regular fa-circle-user">ADMIN</i>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="fa-solid fa-maximize"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    <main>
+        <div class="container_search">
+            <div class="header_search">
+                <h1> OSS USER GUIDE </h1>
+            </div>
+            <div class="input_search">
+                <input id="main_search_bar" type="text" placeholder="masukkan nama guide yang anda butuhkan">
+                <button id="main_search_button">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </div>
+        </div>
+        <div class="container_popular">
+            <h1>Popular Guides</h1>
+            <div id="cardPopularCont" class="card_popular">
+
+            </div>
+        </div>
+    </main>
+    <footer>
+
+    </footer>
+    <script src="/js/app.js"></script>
+</body>
+</html>

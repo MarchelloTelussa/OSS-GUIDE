@@ -22,13 +22,15 @@ function showPopularGuides() {
   const popularItems = database.slice(0, 5); 
   
   popularItems.forEach(function(item) {
-    const guideCard = document.createElement('div');
+    const guideCard = document.createElement('a');
     guideCard.classList.add('guide_popular');
+
+    guideCard.href = `guide.html?id=${item.id}`;
     
     guideCard.innerHTML = `
       <div>
           <h2 style="margin: 0; color: var(--black);">${item.title}</h2>
-          <p style="margin: 5px 0 0 0; color: var(--grey); font-size: 14px;">Category: ${item.category}</p>
+          <p style="margin: 5px 0 0 0; color: var(--grey); font-size: 14px;">Deskripsi: ${item.functionDesc}</p>
       </div>
       <i class="fa-solid fa-chevron-right"></i>
     `;
@@ -77,13 +79,15 @@ searchButton.addEventListener('click', function(e) {
 
     } else {
     matchedResults.forEach(function(item) {
-      const resultCard = document.createElement('div');
+      const resultCard = document.createElement('a');
       
         resultCard.classList.add('guide_popular');
+        resultCard.href = `guide.html?id=${item.id}`;
+
             resultCard.innerHTML = `
             <div>
-                <h2 style="margin: 0; color: var(--black);">${item.title}</h2>
-                <p style="margin: 5px 0 0 0; color: var(--grey); font-size: 14px;">Category: ${item.category}</p>
+                <h2 style="margin: 0;">${item.title}</h2>
+                <p style="margin: 5px 0 0 0; color: var(--grey); font-size: 14px;">Deskripsi: ${item.functionDesc}</p>
             </div>
             <i class="fa-solid fa-chevron-right"></i>
             `;
@@ -92,3 +96,7 @@ searchButton.addEventListener('click', function(e) {
     });
     }
 });
+
+function GenerateCard() {
+  if ()
+}

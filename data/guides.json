@@ -1,23 +1,325 @@
 [
-  { "id": 1, "title": "Login", "category": "Masuk ke aplikasi" },
-  { "id": 2, "title": "Logout", "category": "Keluar dari aplikasi" },
-  { "id": 3, "title": "Create Team IKR", "category": "Membuat tim IKR" },
-  { "id": 4, "title": "Create Work Order IKR", "category": "Membuat work order IKR" },
-  { "id": 5, "title": "Assign Work Order IKR", "category": "Menugaskan work order IKR" },
-  { "id": 6, "title": "Monitoring IKR", "category": "Memantau pekerjaan IKR" },
-  { "id": 7, "title": "Download Foto IKR", "category": "Mengunduh foto IKR" },
-  { "id": 8, "title": "Create Team Backbone", "category": "Membuat tim Backbone" },
-  { "id": 9, "title": "Create Work Order Backbone", "category": "Membuat work order Backbone" },
-  { "id": 10, "title": "Assign Work Order Backbone", "category": "Menugaskan work order Backbone" },
-  { "id": 11, "title": "Monitoring Backbone", "category": "Memantau pekerjaan Backbone" },
-  { "id": 12, "title": "Download Foto Backbone", "category": "Mengunduh foto Backbone" },
-  { "id": 13, "title": "Create Team Project", "category": "Membuat tim Project" },
-  { "id": 14, "title": "Create Work Order Project", "category": "Membuat work order Project" },
-  { "id": 15, "title": "Assign Work Order Project", "category": "Menugaskan work order Project" },
-  { "id": 16, "title": "Monitoring Project", "category": "Memantau pekerjaan Project" },
-  { "id": 17, "title": "Catat Material Masuk", "category": "Mencatat material masuk" },
-  { "id": 18, "title": "Catat Material Keluar", "category": "Mencatat material keluar" },
-  { "id": 19, "title": "Catat Material Transfer", "category": "Mencatat transfer material" },
-  { "id": 20, "title": "Assign Material ke Teknisi", "category": "Menugaskan material ke teknisi" },
-  { "id": 21, "title": "Memantau Material Collect", "category": "Memantau pengambilan material" }
+  {
+    "id": 1,
+    "importantNote": "Pastikan memiliki akun HRIS yang aktif dan perangkat terhubung dengan internet sebelum menggunakan aplikasi.",
+    "title": "Login",
+    "functionDesc": "Panduan untuk masuk ke OSS Web dan mengenali halaman home serta menu aplikasi.",
+    "steps": [
+      "Buka halaman OSS-Web https://oss-replace.quantumnusatama.id",
+      "Isi kolom username dan password",
+      "Isi CAPTCHA sesuai dengan yang ditampilkan.",
+      "Klik tombol Login hingga masuk ke halaman home OSS Web.",
+      "Arahkan kursor atau mouse ke bagian kiri halaman untuk menampilkan menu."
+    ],
+    "videoUrl": "/media/videos/Login.mp4"
+  },
+
+  {
+    "id": 2,
+    "importantNote": "IKR, Backbone, Project merupakan tipe pekerjaan yang berbeda dan memerlukan tim yang berbeda juga",
+    "title": "Create Team IKR",
+    "functionDesc": "Panduan untuk membuat team yang akan digunakan dalam pengerjaan Work Order.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu Operation -> Team -> IKR.",
+      "Isi data team sesuai kebutuhan, seperti tanggal, tipe team, status, cabang, teknisi, dan status motor.",
+      "Klik Reset jika ingin mengosongkan seluruh kolom.",
+      "Klik Create untuk membuat team."
+    ],
+    "videoUrl": "/media/videos/IKR/Create Team IKR.mp4"
+  },
+
+  {
+    "id": 3,
+    "importantNote": "IKR, Backbone, Project merupakan tipe pekerjaan yang berbeda dan memerlukan tim yang berbeda juga",
+    "title": "Create Team Backbone",
+    "functionDesc": "Panduan untuk membuat team yang akan digunakan dalam pengerjaan Work Order.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu Operation -> Team -> Backbone.",
+      "Isi data team sesuai kebutuhan, seperti tanggal, tipe team, status, region, cabang, teknisi.",
+      "Klik Reset jika ingin mengosongkan seluruh kolom.",
+      "Klik Create untuk membuat team."
+    ],
+    "videoUrl": "/media/videos/Backbone/Create Team Backbone.mp4"
+  },
+
+  {
+    "id": 4,
+    "importantNote": "IKR, Backbone, Project merupakan tipe pekerjaan yang berbeda dan memerlukan tim yang berbeda juga",
+    "title": "Create Team Project",
+    "functionDesc": "Panduan untuk membuat team yang akan digunakan dalam pengerjaan Work Order.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu Operation -> Team -> Project.",
+      "Isi data team sesuai kebutuhan, seperti tanggal, tipe team, status, region, cabang, teknisi.",
+      "Klik Reset jika ingin mengosongkan seluruh kolom.",
+      "Klik Create untuk membuat team."
+    ],
+    "videoUrl": "/media/videos/Project/Create Team Project.mp4"
+  },
+
+  {
+    "id": 5,
+    "importantNote": "Gunakan filter untuk menemukan Work Order yang ingin diproses. Tombol reset digunakan untuk menghapus isi filter.",
+    "title": "Work Order IKR",
+    "functionDesc": "Panduan untuk melakukan assign teknisi pada Work Order IKR.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, klik Assign & Monitoring -> IKR.",
+      "Isi filter yang diperlukan, lalu klik tombol pencarian untuk menampilkan Work Order.",
+      "Pada tabel Action, klik action berwarna merah.",
+      "Klik Assign Teknisi.",
+      "(optional)Pilih teknisi tambahan melalui dropdown Pilih Teknisi Tambahan jika diperlukan.",
+      "Klik Tambahkan ke Daftar setelah memilih teknisi.",
+      "Klik Assign untuk menyimpan penugasan."
+    ],
+    "videoUrl": "/media/videos/IKR/Assign WO IKR.mp4"
+  },
+
+  {
+    "id": 6,
+    "importantNote": "Gunakan filter untuk menemukan Work Order yang ingin diproses. Tombol reset digunakan untuk menghapus isi filter.",
+    "title": "Work Order Backbone",
+    "functionDesc": "Panduan untuk melakukan assign teknisi pada Work Order Backbone.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, klik Assign & Monitoring -> Backbone.",
+      "Isi filter yang diperlukan, lalu klik tombol pencarian untuk menampilkan Work Order.",
+      "Pada tabel Action, klik action berwarna merah.",
+      "Klik Assign Teknisi.",
+      "(optional)Pilih teknisi tambahan melalui dropdown Pilih Teknisi Tambahan jika diperlukan.",
+      "Klik Tambahkan ke Daftar setelah memilih teknisi.",
+      "Klik Assign untuk menyimpan penugasan."
+    ],
+    "videoUrl": "/media/videos/Backbone/Assign WO Backbone.mp4"
+  },
+
+  {
+    "id": 7,
+    "importantNote": "Gunakan filter untuk menemukan Work Order yang ingin diproses. Tombol reset digunakan untuk menghapus isi filter.",
+    "title": "Work Order Project",
+    "functionDesc": "Panduan untuk melakukan assign teknisi pada Work Order Project.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, klik Assign & Monitoring -> Project.",
+      "Isi filter yang diperlukan, lalu klik tombol pencarian untuk menampilkan Work Order.",
+      "Pada tabel Action, klik action berwarna merah.",
+      "Klik Assign Teknisi.",
+      "(optional)Pilih teknisi tambahan melalui dropdown Pilih Teknisi Tambahan jika diperlukan.",
+      "Klik Tambahkan ke Daftar setelah memilih teknisi.",
+      "Klik Assign untuk menyimpan penugasan."
+    ],
+    "videoUrl": "/media/videos/Project/Assign WO Project.mp4"
+  },
+
+  {
+    "id": 8,
+    "importantNote": "Kolom berwarna merah merupakan kolom wajib. Kombinasi Client dan Type WO dapat menampilkan kolom tambahan.",
+    "title": "Create Work Order Manual IKR",
+    "functionDesc": "Panduan untuk membuat Work Order baru dengan mengisi data pekerjaan yang dibutuhkan.",
+    "steps": [
+      "Buka menu",
+      "Navigasi menu, klik  Create Orders -> IKR.",
+      "Klik tombol \"Create\" di kiri atas.",
+      "Klik \"Create Manual\".",
+      "Isi kolom wajib atau semua kolom.",
+      "Periksa kolom tambahan apabila kombinasi Client dan Type WO memunculkannya.",
+      "Klik Create untuk membuat Work Order.",
+      "Gunakan tombol reset jika ingin mengosongkan seluruh kolom."
+    ],
+    "videoUrl": "/media/videos/IKR/Create WO IKR.mp4"
+  },
+
+  {
+    "id": 9,
+    "importantNote": "Kolom berwarna merah merupakan kolom wajib. Kombinasi Client dan Type WO dapat menampilkan kolom tambahan.",
+    "title": "Create Work Order Manual Backbone",
+    "functionDesc": "Panduan untuk membuat Work Order baru dengan mengisi data pekerjaan yang dibutuhkan.",
+    "steps": [
+      "Buka menu",
+      "Navigasi menu, klik  Create Orders -> Backbone.",
+      "Klik tombol \"Create\" di kiri atas.",
+      "Klik \"Create Manual\".",
+      "Isi kolom wajib atau semua kolom.",
+      "Periksa kolom tambahan apabila kombinasi Client dan Type WO memunculkannya.",
+      "Klik Create untuk membuat Work Order.",
+      "Gunakan tombol reset jika ingin mengosongkan seluruh kolom."
+    ],
+    "videoUrl": "/media/videos/Backbone/Create WO Backbone.mp4"
+  },
+
+  {
+    "id": 10,
+    "importantNote": "Kolom berwarna merah merupakan kolom wajib. Kombinasi Client dan Type WO dapat menampilkan kolom tambahan.",
+    "title": "Create Work Order Manual Project",
+    "functionDesc": "Panduan untuk membuat Work Order baru dengan mengisi data pekerjaan yang dibutuhkan.",
+    "steps": [
+      "Buka menu",
+      "Navigasi menu, klik  Create Orders -> Project.",
+      "Klik tombol \"Create\" di kiri atas.",
+      "Klik \"Create Manual\".",
+      "Isi kolom wajib atau semua kolom.",
+      "Periksa kolom tambahan apabila kombinasi Client dan Type WO memunculkannya.",
+      "Klik Create untuk membuat Work Order.",
+      "Gunakan tombol reset jika ingin mengosongkan seluruh kolom."
+    ],
+    "videoUrl": "/media/videos/Project/Create WO Project.mp4"
+  },
+
+  {
+    "id": 11,
+    "importantNote": "Detail progress atau aktivitas dapat dilihat dari halaman detail Work Order setelah Work Order ditemukan.",
+    "title": "Monitoring Work Order IKR",
+    "functionDesc": "Panduan untuk mencari Work Order dan melihat detail serta progress atau aktivitas pekerjaan.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, Klik Assign & Monitoring -> IKR.",
+      "Gunakan filter untuk menemukan Work Order yang ingin dipantau.",
+      "Klik nomor Work Order Client untuk membuka detail Work Order.",
+      "Pada halaman detail, cari bagian Activity."
+    ],
+    "videoUrl": "/media/videos/IKR/Monitoring WO IKR.mp4"
+  },
+
+  {
+    "id": 12,
+    "importantNote": "Detail progress atau aktivitas dapat dilihat dari halaman detail Work Order setelah Work Order ditemukan.",
+    "title": "Monitoring Work Order Backbone",
+    "functionDesc": "Panduan untuk mencari Work Order dan melihat detail serta progress atau aktivitas pekerjaan.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, Klik Assign & Monitoring -> Backbone.",
+      "Gunakan filter untuk menemukan Work Order yang ingin dipantau.",
+      "Klik nomor Work Order Client untuk membuka detail Work Order.",
+      "Pada halaman detail, cari bagian Installation Report & Activity untuk melihat progress atau aktivitas."
+    ],
+    "videoUrl": "/media/videos/Backbone/Monitoring WO Backbone.mp4"
+  },
+
+  {
+    "id": 13,
+    "importantNote": "Detail progress atau aktivitas dapat dilihat dari halaman detail Work Order setelah Work Order ditemukan.",
+    "title": "Monitoring Work Order Project",
+    "functionDesc": "Panduan untuk mencari Work Order dan melihat detail serta progress atau aktivitas pekerjaan.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, Klik Assign & Monitoring -> Project.",
+      "Gunakan filter untuk menemukan Work Order yang ingin dipantau.",
+      "Klik nomor Work Order Client untuk membuka detail Work Order.",
+      "Pada halaman detail, cari bagian Activity."
+    ],
+    "videoUrl": "/media/videos/Project/ Monitoring WO Project.mp4"
+  },
+
+  {
+    "id": 14,
+    "importantNote": "Material harus tersedia pada stok sebelum dipilih untuk dibuat menjadi package.",
+    "title": "Create & Assign Material ke Tim",
+    "functionDesc": "Panduan untuk membuat package material dari material yang tersedia pada stok & Assign kepada Tim Teknisi.",
+    "steps": [
+      "============================ CREATE =======================================",
+      "Buka menu.",
+      "Navigasi menu, klik Logistik -> Material In Technician ",
+      "Klik Material in Technician.",
+      "Gunakan filter untuk melihat material yang tersedia.",
+      "Klik tombol pencarian untuk menerapkan filter.",
+      "Pada kolom Stok Tersedia, checklist material yang ingin dipackage.",
+      "Klik tombol + Tambah.",
+      "Pastikan Qty atau kuantitas setiap material yang ditambahkan sudah sesuai.",
+      "Klik Create Package.",
+      "============================ ASSIGN =======================================",
+      "Cari material yang belum di-assign pada kolom Action.",
+      "Klik action berwarna hijau.",
+      "Cari dan pilih teknisi penerima pada dropdown.",
+      "Klik Assign."
+    ],
+    "videoUrl": "/media/videos/Create + Assign Material.mp4"
+  },
+
+  {
+    "id": 15,
+    "importantNote": "Bukti material diterima perlu disiapkan dalam bentuk foto atau PDF.",
+    "title": "Material In",
+    "functionDesc": "Panduan untuk mencatat material yang masuk ke aplikasi beserta bukti penerimaannya.",
+    "steps": [
+      "Klik Logistik.",
+      "Klik Material In.",
+      "Isi form Identitas Material.",
+      "Upload foto atau PDF sebagai bukti material diterima.",
+      "Tambahkan item material.",
+      "Lengkapi data material yang diperlukan, termasuk cabang, tipe, tanggal rilis, klien, nomor dokumen, karyawan request, dan karyawan receive."
+    ],
+    "videoUrl": "/media/videos/material/Material In.mp4"
+  },
+
+  {
+    "id": 16,
+    "importantNote": "Gunakan rentang waktu atau nomor dokumen untuk menemukan data material return secara lebih spesifik.",
+    "title": "Material Return",
+    "functionDesc": "Panduan untuk mencatat material yang dikembalikan ke klien, melihat riwayat return, dan melakukan konfirmasi.",
+    "steps": [
+      "Klik Logistik.",
+      "Klik Material Return.",
+      "Isi data identitas material.",
+      "Pilih material.",
+      "Klik tombol pencarian untuk menampilkan stok material yang dipilih.",
+      "Checklist material yang ingin direturn.",
+      "Klik Tambahkan ke Return.",
+      "Periksa tabel material yang akan diretur.",
+      "Klik Buat Return untuk menyimpan data return.",
+      "Untuk melihat material yang pernah diretur, isi rentang waktu atau nomor dokumen lalu klik tombol pencarian.",
+      "Untuk konfirmasi material yang diretur, cari material yang ingin dikonfirmasi, klik tombol hijau, lalu verifikasi dengan memilih Ya, terima."
+    ],
+    "videoUrl": "/media/videos/material/Material retur.mp4"
+  },
+
+  {
+    "id": 17,
+    "importantNote": "Pastikan material yang akan ditransfer sudah ditemukan melalui filter dan dipilih sebelum membuat data transfer.",
+    "title": "Material Transfer",
+    "functionDesc": "Panduan untuk mencatat perpindahan atau transfer material dan melakukan proses konfirmasi.",
+    "steps": [
+      "Klik Logistik dan buka menu Material Transfer.",
+      "Isi data identitas material.",
+      "Pilih material.",
+      "Klik tombol pencarian untuk menampilkan stok material yang dipilih.",
+      "Checklist material yang ingin ditransfer.",
+      "Klik Tambah.",
+      "Periksa tabel material yang akan ditransfer.",
+      "Klik Buat Transfer untuk menyimpan data transfer.",
+      "Gunakan rentang waktu atau nomor dokumen untuk mencari data transfer.",
+      "Klik tombol pencarian untuk menampilkan data transfer yang ingin dikonfirmasi."
+    ],
+    "videoUrl": "/media/videos/material/Material transfer.mp4"
+  },
+
+  {
+    "id": 18,
+    "importantNote": "Menu monitoring Material Collect.",
+    "title": "Material Collect",
+    "functionDesc": "Panduan untuk memantau pengambilan material.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, klik Logistik -> Material Collect.",
+      "Untuk verifikasi Material Collect, gunakan filter untuk mencari material.",
+      "Checklist material yang ingin diverifikasi.",
+      "Tekan tombol Verifikasi."
+    ],
+    "videoUrl": "/media/videos/material/Material Collect.mp4"
+  },
+
+  {
+    "id": 19,
+    "importantNote": "Menu monitoring Stok material.",
+    "title": "Stock",
+    "functionDesc": "Panduan untuk stok material.",
+    "steps": [
+      "Buka menu.",
+      "Navigasi menu, klik Logistik -> Stock.",
+      "Untuk melihat material di stok, gunakan filter untuk mencari material.",
+      "Klik tombol pencarian untuk menampilkan hasil stok."
+    ],
+    "videoUrl": "/media/videos/material/Stock.mp4"
+  }
 ]

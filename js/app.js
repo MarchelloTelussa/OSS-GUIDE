@@ -1,102 +1,81 @@
-let searchInput = document.querySelector('#main_search_bar');
-const searchButton = document.querySelector('#main_search_button');
-const resultsContainer = document.querySelector('#cardPopularCont');
+import { getAllData } from './api.js';
 
-//START
+let searchInput = document.querySelector('#main_search_bar'); 
+const searchButton = document.querySelector('#main_search_button');
+const cardContainer = document.querySelector('#cardPopularCont');
+
 let database = [];
 
-async function loadData() {
-    try { 
-        const response = await fetch('/data/guides.json');
-        database = await response.json();
-        showPopularGuides();
-    } catch (error) {
-        console.error("Failed to load databse: ", error);
-    }
-}
+function buildCard(cardData) {
+  if (!cardData || typeof cardData !== 'object') return;
 
-loadData();
-
-//Load PopularGuides (belum berdasarakan prioritas hanya berdasarkan urutan palign atas di Json)
-function showPopularGuides() {
-  const popularItems = database.slice(0, 5); 
-  
-  popularItems.forEach(function(item) {
-    const guideCard = document.createElement('a');
-    guideCard.classList.add('guide_popular');
-
-    guideCard.href = `guide.html?id=${item.id}`;
-    
-    guideCard.innerHTML = `
+  const popCard = document.createElement('a');
+  popCard.classList.add('guide_popular');
+  popCard.href = `guide.html?id=${cardData.id}`;
+  popCard.innerHTML = `
       <div>
-          <h2 style="margin: 0; color: var(--black);">${item.title}</h2>
-          <p style="margin: 5px 0 0 0; color: var(--grey); font-size: 14px;">Deskripsi: ${item.functionDesc}</p>
+          <h2>${cardData.title || ''}</h2>
+          <p>Deskripsi: ${cardData.functionDesc || '-'}</p>
       </div>
       <i class="fa-solid fa-chevron-right"></i>
     `;
-    
-    // Inject the generated card into the Popular container
-    resultsContainer.appendChild(guideCard);
-  });
+  cardContainer.appendChild(popCard);
 }
 
-//Search Function
+function showPopCard(searchResult = []) {
+  cardContainer.innerHTML = "";
+
+  if (searchResult.length === 0) {
+    const topFiveCard = database.slice(0, 5);
+    topFiveCard.forEach(item => buildCard(item));
+  } else {
+    searchResult.forEach(item => buildCard(item));
+  }
+}
+
+async function init() {
+  const rawData = await getAllData();
+  
+  database = Array.isArray(rawData) ? rawData.flat(Infinity) : [rawData];
+  
+  showPopCard();
+}
+
+init();
+
 searchButton.addEventListener('click', function(e) {
   e.preventDefault();
-  
+
   const searchQuery = searchInput.value.toLowerCase().trim();
   const originalPlaceholder = searchInput.placeholder;
-  resultsContainer.innerHTML = "";
-
+  
   if (searchQuery === "") {
-    searchInput.placeholder = "Input cannot be empty!";
+    searchInput.placeholder = "Input tidak boleh kosong!";
     searchInput.classList.add('error-state');
-    showPopularGuides();
+    showPopCard();
 
-
-    setTimeout(function() {
-        searchInput.placeholder = originalPlaceholder;
-        searchInput.classList.remove('error-state');
+    setTimeout(() => {
+      searchInput.placeholder = originalPlaceholder;
+      searchInput.classList.remove('error-state');
     }, 2500);
-
-    return; 
+    return;
   }
 
-  const matchedResults = database.filter(function(item) {
-    return item.title.toLowerCase().includes(searchQuery);
+  const searchMatched = database.filter(item => {
+    return item && item.title && item.title.toLowerCase().includes(searchQuery);
   });
 
-  if (matchedResults.length === 0) {
-    searchInput.value = null;
+  if (searchMatched.length === 0) {
+    searchInput.value = "";
     searchInput.placeholder = "Not found";
     searchInput.classList.add('error-state');
-    showPopularGuides();
+    showPopCard();
 
-    setTimeout(function() {
-        searchInput.placeholder = originalPlaceholder;
-        searchInput.classList.remove('error-state');
+    setTimeout(() => {
+      searchInput.placeholder = originalPlaceholder;
+      searchInput.classList.remove('error-state');
     }, 2500);
-
-    } else {
-    matchedResults.forEach(function(item) {
-      const resultCard = document.createElement('a');
-      
-        resultCard.classList.add('guide_popular');
-        resultCard.href = `guide.html?id=${item.id}`;
-
-            resultCard.innerHTML = `
-            <div>
-                <h2 style="margin: 0;">${item.title}</h2>
-                <p style="margin: 5px 0 0 0; color: var(--grey); font-size: 14px;">Deskripsi: ${item.functionDesc}</p>
-            </div>
-            <i class="fa-solid fa-chevron-right"></i>
-            `;
-      
-      resultsContainer.appendChild(resultCard);
-    });
-    }
+  } else {
+    showPopCard(searchMatched);
+  }
 });
-
-function GenerateCard() {
-  if ()
-}

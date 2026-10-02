@@ -9,6 +9,7 @@
     :root {
         --black : rgb(0, 0, 0);
         --white : rgb(255, 255, 255);
+        --snowwhite : rgb(251, 251, 251);
         --lightgrey : rgb(200, 206, 214);
         --grey : rgb(108, 117, 125);
         --darkgrey : rgb(71, 85, 105);
@@ -25,12 +26,18 @@
     nav .nav_profile li {list-style: none;}
     nav .nav_profile li a i{text-decoration: none;}
 
-    main {display: flex; flex-direction: column; align-content: stretch; flex: 1; overflow-y: scroll;}
-    /* Styling for the Important Note */
-    .container { display: flex; flex-direction: column; padding: 0px 100px; gap: 30px;}
+    main {display: flex; flex-direction: column; align-content: stretch; flex: 1; overflow-y: scroll; background-color: var(--snowwhite);}
+
+    .container { display: flex; flex-direction: column; margin: 0 100px; min-height: 100vh; background-color: var(--white);}
     .container .guide-title {display: flex; align-items: center; color: var(--white); background-color: var(--black); padding: 15px 5px ;}
-    .container .guide-steps {list-style-position: inside;}
-    .container .guide-video video{width: 100%;}
+        
+    .container .split { display: grid; grid-template-columns: 6.5fr 3.5fr; gap: 24px; width: 100%; flex: 1; min-height: 100vh;}
+
+    .container .split .left { display: flex; flex-direction: column; align-items: end; min-width: 0; height: 100%; padding-right: 5px; border-right: 2px solid #e0e0e0; gap: 10px; align-items: center;}
+    .container .split .right { display: flex; flex-direction:column; align-items: center; height: 100%; width: 100%; box-sizing: border-box; gap: 10px;}
+    
+    .container .split .left .guide-video video { width: 100%; height: auto;}
+    .container .split .left .guide-desc {}
 </style>
 </head>
 
@@ -38,7 +45,7 @@
     <nav>
         <ul class="nav_profile">
             <li>
-                <a href="guide.html">
+                <a href="index.html">
                     <i class="fa-regular fa-circle-question"></i>   
                 </a>
             </li>
@@ -64,6 +71,6 @@
             
         </div>
     </main>
-    <script src="/js/guide.js"></script>
+    <script type="module" src="/js/guide.js"></script>
 </body>
 </html>

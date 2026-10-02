@@ -10,11 +10,11 @@ function loadGuidePage() {
     <div class="split">
         <div class="left">
             <div class="guide-video"> <video controls src="${data.videoUrl}" type="video/mp4"></video> </div>
-            <div class="guide-desc"> <h3>${data.functionDesc}</h3> </div>
         </div>
         <div class ="right">
-            <div> <p> <b>Important note:</b> ${data.importantNote} </p> </div>
-            <div> <ol> ${data.steps.map(step => ` <li>${step}</li> `).join("")} </ol> </div>
+            <div class="guide-desc"> <h3>${data.functionDesc}</h3> </div>
+            <div class="guide-note"> <p> <b>Important note:</b> ${data.importantNote} </p> </div>
+            <div class="guide-steps"> <ol> ${data.steps.map(step => ` <li>${step}</li> `).join("")} </ol> </div>
         </div>
     </div>
     `;

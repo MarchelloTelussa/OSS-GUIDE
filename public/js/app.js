@@ -47,7 +47,7 @@ searchButton.addEventListener('click', function(e) {
   e.preventDefault();
 
   const searchQuery = searchInput.value.toLowerCase().trim();
-  const originalPlaceholder = searchInput.placeholder;
+  const originalPlaceholder = "masukkan nama guide yang anda butuhkan";
   
   if (searchQuery === "") {
     searchInput.placeholder = "Input tidak boleh kosong!";

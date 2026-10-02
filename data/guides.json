@@ -4,7 +4,7 @@
     "importantNote": "Pastikan memiliki akun HRIS yang aktif dan perangkat terhubung dengan internet sebelum menggunakan aplikasi.",
     "title": "Login",
     "functionDesc": "Panduan untuk masuk ke OSS Web dan mengenali halaman home serta menu aplikasi.",
-    "steps": [
+    "steps": [  
       "Buka halaman OSS-Web https://oss-replace.quantumnusatama.id",
       "Isi kolom username dan password",
       "Isi CAPTCHA sesuai dengan yang ditampilkan.",

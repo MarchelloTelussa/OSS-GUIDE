@@ -16,7 +16,7 @@
         --blue : rgb(13, 110, 253);
         --red : rgb(220, 53, 69);
         --green : rgb(74, 222, 128);
-        --bg : rgb(248, 249,a250);
+        --bg : rgb(248, 249, 250);
     }
     * {margin: 0; padding: 0; box-sizing: border-box;}
     body {display: flex; flex-direction: column; min-height: 100vh; font-family: Arial, sans-serif;overflow-y: auto; overflow-behavior: none; background-color: var(--bg);}
@@ -29,7 +29,7 @@
     main {display: flex; flex-direction: column; align-content: stretch; flex: 1; overflow-y: scroll; background-color: var(--snowwhite);}
 
     .container { display: flex; flex-direction: column; margin: 0 100px; min-height: 100vh; background-color: var(--white);}
-    .container .guide-title {display: flex; align-items: center; color: var(--white); background-color: var(--black); padding: 15px 5px ;}
+    .container .guide-title {display: flex; align-items: center; color: var(--white); background-color: var(--black); padding: 15px 50px ;}
         
     .container .split { display: grid; grid-template-columns: 6.5fr 3.5fr; gap: 24px; width: 100%; flex: 1; min-height: 100vh;}
 
@@ -71,6 +71,6 @@
             
         </div>
     </main>
-    <script type="module" src="/js/guide.js"></script>
+    <script type="module" src="./js/guide.js"></script>
 </body>
 </html>

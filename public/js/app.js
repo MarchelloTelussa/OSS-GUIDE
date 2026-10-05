@@ -1,5 +1,3 @@
-import { getAllData } from './api.js';
-
 let searchInput = document.querySelector('#main_search_bar'); 
 const searchButton = document.querySelector('#main_search_button');
 const cardContainer = document.querySelector('#cardPopularCont');
@@ -33,14 +31,27 @@ function showPopCard(searchResult = []) {
   }
 }
 
+async function loadAllGuides() {
+  try {
+    const response = await fetch('/api/guides');
+    if (!response.ok) {
+      throw new Error(`Guide tidak ditemukan (Status: ${response.status})`);
+    }
+    const database = await response.json();
+    return database;
+  } catch (error) {
+    console.error('Gagal mengambil data: ', error);
+  }
+}
+
 async function init() {
-  const rawData = await getAllData();
-  
+  const rawData = await loadAllGuides();
   database = Array.isArray(rawData) ? rawData.flat(Infinity) : [rawData];
-  
   showPopCard();
 }
 
+
+//START//
 init();
 
 searchButton.addEventListener('click', function(e) {

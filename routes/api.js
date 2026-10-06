@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../db.js';
+import { requireAuth } from '../lib/session.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -76,7 +77,7 @@ router.post('/guides/:id/view', async (req, res) => {
     }
 });
 
-router.post('/guides', async (req, res) => {
+router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
     try {
         const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
@@ -116,7 +117,7 @@ router.post('/guides', async (req, res) => {
     }
 });
 
-router.post('/upload-video', async (req, res) => {
+router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
     try {
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = path.dirname(__filename);

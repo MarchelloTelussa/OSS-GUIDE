@@ -26,6 +26,11 @@ stepsContainer.addEventListener('click', (e) => {
     }
 });
 
+addStepBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    addStepField();
+});
+
 function showMessage(message, type) {
     messageDiv.textContent = message;
     messageDiv.className = `message ${type}`;
@@ -37,11 +42,6 @@ function showMessage(message, type) {
         }, 2000);
     }
 }
-
-addStepBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    addStepField();
-});
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -66,6 +66,11 @@ form.addEventListener('submit', async (e) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, functionDesc, importantNote, videoUrl, steps })
         });
+
+        if (response.status === 401 || response.status === 403) {
+            window.location.href = 'login.html';
+            return;
+        }
 
         const result = await response.json();
 

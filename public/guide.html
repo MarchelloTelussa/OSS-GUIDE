@@ -24,67 +24,23 @@
     nav .nav_profile li {list-style: none;}
     nav .nav_profile li a i{text-decoration: none;}
 
-    main {
-    display: flex; 
-    flex-direction: column; 
-    background-color: var(--snowwhite);
-    flex: 1;
-    /* Removed overflow-y: scroll to eliminate double scrollbars */
-    }
+    main { display: flex; flex-direction: column; background-color: var(--snowwhite); flex: 1; /* Removed overflow-y: scroll to eliminate double scrollbars */ }
 
-    .guide-container { 
-    display: flex; 
-    flex-direction: column; 
-    margin: 0 100px; 
-    min-height: 100vh; 
-    background-color: var(--white);
-    }
+    .guide-container { display: flex; flex-direction: column; margin: 0 100px; min-height: 100vh; background-color: var(--white); }
 
-    .container .guide-title {
-    display: flex; 
-    align-items: center; 
-    color: var(--white); 
-    background-color: var(--blue); 
-    padding: 15px 50px;
-    }
+    .guide-header { display: flex; justify-content: space-between; align-items: center; background-color: var(--blue); padding: 15px 50px; }
 
-    .container .split { 
-    display: grid; 
-    grid-template-columns: 8.4fr 1.6fr; 
-    width: 100%; 
-    flex: 1; /* Automatically takes remaining space without adding extra 100vh */
-    }
+    .btn-edit a { color: var(--white); text-decoration: none; text}
 
-    .container .split .left { 
-    display: flex; 
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-width: 0; 
-    border-right: 2px solid var(--black); 
-    background-color: var(--lightgrey);
-    }
+    .guide-title { color: var(--white); }
 
-    .container .split .left .guide-video video { 
-    width: 100%;
-    }
+    .split { display: grid; grid-template-columns: 8.4fr 1.6fr; width: 100%; flex: 1; /* Automatically takes remaining space without adding extra 100vh */ }
 
-    .container .split .right { 
-    display: flex; 
-    flex-direction: column;  
-    width: 100%; 
-    gap: 20px; 
-    background-color: var(--snowwhite); 
-    list-style: inside; 
-    padding: 1rem; /* Consolidated duplicate padding declarations */
-    min-height: 0; /* Allows nested content with overflow-y to scroll properly */
-    }
+    .split .left { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; border-right: 2px solid var(--black); background-color: var(--lightgrey); }
+    .split .left .guide-video video { width: 100%; }
 
-    .container .split .right .guide-note {
-    border-bottom: 2px solid var(--black);
-    border-top: 2px solid var(--black);
-    padding: 10px 0;
-    }
+    .split .right { display: flex; flex-direction: column; width: 100%; gap: 20px; background-color: var(--snowwhite); list-style: inside; padding: 1rem; /* Consolidated duplicate padding declarations */ min-height: 0; /* Allows nested content with overflow-y to scroll properly */ }
+    .split .right .guide-note { border-bottom: 2px solid var(--black); border-top: 2px solid var(--black); padding: 10px 0; }
 </style>
 </head>
 
@@ -102,17 +58,12 @@
                 </a>
             </li>
             <li>
-                <a href="#">
-                    <i class="fa-solid fa-clipboard-list"></i>
-                </a>
-            </li>
-            <li>
                 <a href="#" id="navUser">
                     <i class="fa-regular fa-circle-user"></i>
                 </a>
             </li>
             <li>
-                <a href="#">
+                <a href="#" id="fullscreenBtn">
                     <i class="fa-solid fa-maximize"></i>
                 </a>
             </li>

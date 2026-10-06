@@ -18,7 +18,10 @@ function loadGuidePage() {
 
     const stepsList = Array.isArray(data.steps) ? data.steps : [];
     container.innerHTML = `
+    <div class="guide-header">
     <div class="guide-title"> <h1>${data.title}</h1> </div>
+    <div class="btn-edit"> <a href="edit.html?id=${data.id}"><i class="fa-solid fa-pen-to-square fa-1x"></i></a> </div>
+    </div>
     <div class="split">
         <div class="left">
             <div class="guide-video"> <video controls src="${data.videoUrl}" type="video/mp4"></video> </div>
@@ -86,3 +89,17 @@ loadGuidePage();
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+const btn = document.getElementById('fullscreenBtn');
+
+    btn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        // Request fullscreen for the entire document
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        // Exit fullscreen
+        document.exitFullscreen();
+      }
+});

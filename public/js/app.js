@@ -102,3 +102,17 @@ searchInput.addEventListener('keypress', function(e) {
     performSearch();
   }
 });
+
+const btn = document.getElementById('fullscreenBtn');
+
+    btn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        // Request fullscreen for the entire document
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+      } else {
+        // Exit fullscreen
+        document.exitFullscreen();
+      }
+});

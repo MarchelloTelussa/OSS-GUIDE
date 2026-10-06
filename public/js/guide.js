@@ -30,8 +30,25 @@ function loadGuidePage() {
         </div>
     </div>
     `;
-    
+
     container.classList.add('container');
+}
+
+async function trackGuideView(guideId) {
+    try {
+        const response = await fetch(`/api/guides/${guideId}/view`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`Guide views: ${result.views}`);
+        } else {
+            console.error('Failed to track view:', response.status);
+        }
+    } catch (error) {
+        console.error('Error tracking view:', error);
+    }
 }
 
 async function getSpecGuide() {
@@ -52,9 +69,11 @@ async function getSpecGuide() {
             } else {
                 console.error(`Error fetching guide (Status: ${response.status})`);
             }
-            return null;       
+            return null;
         }
         specData = await response.json();
+
+        await trackGuideView(guideId);
     } catch (error) {
         console.error('Error fetching specific guide:', error);
     }

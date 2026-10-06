@@ -1,4 +1,4 @@
-let searchInput = document.querySelector('#main_search_bar'); 
+let searchInput = document.querySelector('#main_search_bar');
 const searchButton = document.querySelector('#main_search_button');
 const cardContainer = document.querySelector('#cardPopularCont');
 
@@ -47,6 +47,7 @@ async function loadAllGuides() {
 async function init() {
   const rawData = await loadAllGuides();
   database = Array.isArray(rawData) ? rawData.flat(Infinity) : [rawData];
+  database.sort((a, b) => (b.views || 0) - (a.views || 0));
   showPopCard();
 }
 
@@ -54,12 +55,10 @@ async function init() {
 //START//
 init();
 
-searchButton.addEventListener('click', function(e) {
-  e.preventDefault();
-
+function performSearch() {
   const searchQuery = searchInput.value.toLowerCase().trim();
   const originalPlaceholder = "masukkan nama guide yang anda butuhkan";
-  
+
   if (searchQuery === "") {
     searchInput.placeholder = "Input tidak boleh kosong!";
     searchInput.classList.add('error-state');
@@ -87,6 +86,19 @@ searchButton.addEventListener('click', function(e) {
       searchInput.classList.remove('error-state');
     }, 2500);
   } else {
+    searchMatched.sort((a, b) => (b.views || 0) - (a.views || 0));
     showPopCard(searchMatched);
+  }
+}
+
+searchButton.addEventListener('click', function(e) {
+  e.preventDefault();
+  performSearch();
+});
+
+searchInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    performSearch();
   }
 });

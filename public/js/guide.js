@@ -21,10 +21,16 @@ async function loadGuidePage() {
         return;
     }
 
-    // Render tombol edit HANYA jika user adalah ITAdmin
+    // Render tombol edit+delete HANYA jika user adalah ITAdmin
     const editButtonHTML = (user && user.role === 'ITAdmin') ? `
         <div class="btn-edit">
             <a href="edit.html?id=${data.id}"><i class="fa-solid fa-pen-to-square fa-1x"></i></a>
+        </div>
+    ` : '';
+
+    const deleteButtonHTML = (user && user.role === 'ITAdmin') ? `
+        <div class="btn-delete">
+            <a href="#" id="deleteGuideBtn"><i class="fa-solid fa-trash-can"></i></a>
         </div>
     ` : '';
 
@@ -33,7 +39,10 @@ async function loadGuidePage() {
     container.innerHTML = `
     <div class="guide-header">
         <div class="guide-title"> <h1>${data.title}</h1> </div>
-        ${editButtonHTML}
+        <div class="guide-button">
+            ${editButtonHTML}
+            ${deleteButtonHTML}
+        </div>
     </div>
     <div class="split">
         <div class="left">

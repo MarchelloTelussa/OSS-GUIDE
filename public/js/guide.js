@@ -37,7 +37,7 @@ async function loadGuidePage() {
     </div>
     <div class="split">
         <div class="left">
-            <div class="guide-video"> <video controls src="${data.videoUrl}" type="video/mp4"></video> </div>
+            <div class="guide-video"> <video controls src="${data.videoUrl}"></video> </div>
         </div>
         <div class="right">
             <div class="guide-desc"> <h3>${data.functionDesc}</h3> </div>

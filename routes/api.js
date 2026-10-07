@@ -7,6 +7,16 @@ import { fileURLToPath } from 'url';
 
 const router = express.Router();
 
+const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
+const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
+
+// Cek isi file (magic bytes) agar file non-video yang hanya diganti namanya ditolak
+function looksLikeVideo(buf, ext) {
+    if (['.mp4', '.m4v', '.mov'].includes(ext)) return buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp';
+    if (ext === '.webm') return buf.length > 4 && buf.readUInt32BE(0) === 0x1A45DFA3;
+    return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS'; // .ogv / .ogg
+}
+
 router.get('/guides', async (req, res) => {
     try {
         const queryText = `
@@ -86,10 +96,10 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         return res.status(400).json({ error: 'Semua field utama wajib diisi' });
     }
 
-    const client = await db.getClient ? await db.getClient() : db; 
-    // Catatan: Jika menggunakan pool PostgreSQL (pg), gunakan transaksi
+    // Satu koneksi khusus agar BEGIN/COMMIT benar-benar satu transaksi
+    const client = await db.getClient();
     try {
-        if (client.query) await client.query('BEGIN');
+        await client.query('BEGIN');
 
         // 2. Update data utama pada tabel 'content'
         const updateContentQuery = `
@@ -111,7 +121,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         ]);
 
         if (contentResult.rows.length === 0) {
-            if (client.query) await client.query('ROLLBACK');
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Guide tidak ditemukan' });
         }
 
@@ -119,17 +129,18 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [id]);
 
         // 4. Insert langkah-langkah (steps) baru jika ada
-        if (Array.isArray(steps) && steps.length > 0) {
-            for (let i = 0; i < steps.length; i++) {
-                const insertStepQuery = `
-                    INSERT INTO guide_steps (guide_id, step_order, step_description)
-                    VALUES ($1, $2, $3);
-                `;
-                await client.query(insertStepQuery, [id, i + 1, steps[i]]);
+        if (Array.isArray(steps)) {
+            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+            for (let i = 0; i < cleanSteps.length; i++) {
+                await client.query(
+                    `INSERT INTO guide_steps (guide_id, step_order, step_description)
+                     VALUES ($1, $2, $3);`,
+                    [id, i + 1, cleanSteps[i]]
+                );
             }
         }
 
-        if (client.query) await client.query('COMMIT');
+        await client.query('COMMIT');
 
         return res.status(200).json({ 
             message: 'Guide berhasil diperbarui',
@@ -137,11 +148,11 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         });
 
     } catch (error) {
-        if (client.query) await client.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error('Error updating guide:', error.stack);
         return res.status(500).json({ error: 'Internal Server Error' });
     } finally {
-        if (client.release) client.release();
+        client.release();
     }
 });
 
@@ -197,13 +208,24 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
         }
 
         const chunks = [];
-        let filename = '';
+        let received = 0;
+        let tooLarge = false;
 
         req.on('data', (chunk) => {
+            received += chunk.length;
+            if (received > MAX_VIDEO_SIZE) {
+                if (!tooLarge) {
+                    tooLarge = true;
+                    chunks.length = 0;
+                    res.status(413).json({ error: 'Ukuran video maksimal 500 MB' });
+                }
+                return;
+            }
             chunks.push(chunk);
         });
 
         req.on('end', () => {
+            if (tooLarge) return;
             try {
                 const buffer = Buffer.concat(chunks);
                 const contentType = req.headers['content-type'] || '';
@@ -243,9 +265,15 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                     return res.status(400).json({ error: 'No video file provided' });
                 }
 
+                const extension = path.extname(videoFilename).toLowerCase();
+                if (!ALLOWED_VIDEO_EXTENSIONS.includes(extension) || !looksLikeVideo(videoBuffer, extension)) {
+                    return res.status(400).json({
+                        error: `File harus berupa video (${ALLOWED_VIDEO_EXTENSIONS.join(', ')})`
+                    });
+                }
+
                 // Save file with timestamp to avoid conflicts
                 const timestamp = Date.now();
-                const extension = path.extname(videoFilename);
                 const safeFilename = `${timestamp}${extension}`;
                 const filepath = path.join(videosDir, safeFilename);
 

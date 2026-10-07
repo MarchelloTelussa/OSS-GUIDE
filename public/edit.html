@@ -101,9 +101,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="videoPath">Video Path *</label>
-                    <input type="text" id="videoPath" name="videoPath" placeholder="Contoh: /videos/tutorial.mp4" required>
-                    <small style="color: var(--grey); margin-top: 5px;">Masukkan path video di dalam perangkat (letakkan video di folder: /public/videos/)</small>
+                    <label for="videoFile">Video *</label>
+                    <input type="hidden" id="videoPath" name="videoPath">
+                    <input type="file" id="videoFile" name="videoFile" accept=".mp4,.m4v,.mov,.webm,.ogv,.ogg,video/mp4,video/webm,video/ogg,video/quicktime">
+                    <small id="videoCurrent" style="color: var(--grey); margin-top: 5px;">Pilih file video baru untuk mengganti video saat ini (kosongkan jika tidak ingin mengganti).</small>
                 </div>
 
                 <div class="form-group">

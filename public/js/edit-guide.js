@@ -55,6 +55,10 @@ function loadData(data) {
     functionDesc.value = data.functionDesc || '';
     importantNote.value = data.importantNote || '';
     videoUrl.value = data.videoUrl || '';
+    if (data.videoUrl) {
+        document.querySelector('#videoCurrent').textContent =
+            `Video saat ini: ${data.videoUrl}. Pilih file baru untuk menggantinya (kosongkan jika tidak ingin mengganti).`;
+    }
 }
 
 function loadSteps(data) { 
@@ -141,9 +145,47 @@ if (btn) {
     });
 }
 
+// Upload file video ke server (disalin ke public/videos), mengembalikan path-nya
+const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
+const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
+
+function validateVideoFile(file) {
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED_VIDEO_EXTENSIONS.includes(ext) || (file.type && !file.type.startsWith('video/'))) {
+        return `File harus berupa video (${ALLOWED_VIDEO_EXTENSIONS.join(', ')})`;
+    }
+    if (file.size > MAX_VIDEO_SIZE) return 'Ukuran video maksimal 500 MB';
+    return null;
+}
+
+async function uploadVideo(file) {
+    const invalid = validateVideoFile(file);
+    if (invalid) {
+        showMessage(invalid, 'error');
+        return null;
+    }
+    const formData = new FormData();
+    formData.append('video', file);
+
+    const response = await fetch('/api/upload-video', { method: 'POST', body: formData });
+
+    if (response.status === 401 || response.status === 403) {
+        window.location.href = 'login.html';
+        return null;
+    }
+
+    const result = await response.json();
+    if (!response.ok) {
+        showMessage(result.error || 'Gagal mengunggah video', 'error');
+        return null;
+    }
+    return result.videoPath;
+}
+
 // Event handler submit form
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (form.dataset.submitting === 'true') return; // cegah double submit
 
     if (!guideId) {
         showMessage('ID guide tidak ditemukan. Tidak dapat memperbarui data.', 'error');
@@ -153,18 +195,25 @@ form.addEventListener('submit', async (e) => {
     const titleValue = document.querySelector('#title').value.trim();
     const functionDescValue = document.querySelector('#functionDesc').value.trim();
     const importantNoteValue = document.querySelector('#importantNote').value.trim();
-    const videoUrlValue = document.querySelector('#videoPath').value.trim();
+    const videoFile = document.querySelector('#videoFile').files[0];
+    let videoUrlValue = document.querySelector('#videoPath').value.trim();
 
     const steps = Array.from(document.querySelectorAll('.step-input'))
         .map(input => input.value.trim())
         .filter(step => step.length > 0);
 
-    if (!titleValue || !functionDescValue || !importantNoteValue || !videoUrlValue) {
+    if (!titleValue || !functionDescValue || !importantNoteValue || (!videoFile && !videoUrlValue)) {
         showMessage('Semua field wajib diisi', 'error');
         return;
     }
 
+    form.dataset.submitting = 'true';
     try {
+        if (videoFile) {
+            videoUrlValue = await uploadVideo(videoFile);
+            if (!videoUrlValue) { form.dataset.submitting = 'false'; return; }
+        }
+
         const response = await fetch(`/api/guides/${guideId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -188,10 +237,12 @@ form.addEventListener('submit', async (e) => {
             showMessage('Guide berhasil diedit! Mengalihkan...', 'success');
         } else {
             showMessage(result.error || 'Gagal mengedit guide', 'error');
+            form.dataset.submitting = 'false';
         }
     } catch (error) {
         console.error('Error:', error);
         showMessage('Terjadi kesalahan koneksi ke server', 'error');
+        form.dataset.submitting = 'false';
     }
 });
 

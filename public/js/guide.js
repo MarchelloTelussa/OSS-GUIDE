@@ -1,10 +1,15 @@
+import { getUserInfo } from './nav-auth.js';
+
 let data = [];
-function loadGuidePage() {
+async function loadGuidePage() {
     const container = document.querySelector('#guide-container');
     if (!container) {
         console.error("Elemen #guide-container tidak ditemukan di HTML!");
         return;
     }
+
+    // Ambil data user terlebih dahulu
+    const user = await getUserInfo();
 
     if (!data) {
         container.innerHTML = `
@@ -16,17 +21,25 @@ function loadGuidePage() {
         return;
     }
 
+    // Render tombol edit HANYA jika user adalah ITAdmin
+    const editButtonHTML = (user && user.role === 'ITAdmin') ? `
+        <div class="btn-edit">
+            <a href="edit.html?id=${data.id}"><i class="fa-solid fa-pen-to-square fa-1x"></i></a>
+        </div>
+    ` : '';
+
     const stepsList = Array.isArray(data.steps) ? data.steps : [];
+    
     container.innerHTML = `
     <div class="guide-header">
-    <div class="guide-title"> <h1>${data.title}</h1> </div>
-    <div class="btn-edit"> <a href="edit.html?id=${data.id}"><i class="fa-solid fa-pen-to-square fa-1x"></i></a> </div>
+        <div class="guide-title"> <h1>${data.title}</h1> </div>
+        ${editButtonHTML}
     </div>
     <div class="split">
         <div class="left">
             <div class="guide-video"> <video controls src="${data.videoUrl}" type="video/mp4"></video> </div>
         </div>
-        <div class ="right">
+        <div class="right">
             <div class="guide-desc"> <h3>${data.functionDesc}</h3> </div>
             <div class="guide-note"> <p> <b>Important note:</b> ${data.importantNote} </p> </div>
             <div class="guide-steps"> <ol>${stepsList.map(step => `<li>${step}</li>`).join("")}</ol> </div>

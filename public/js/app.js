@@ -31,7 +31,7 @@ function showPopCard(searchResult = []) {
   }
 }
 
-async function loadAllGuides() {
+export async function loadAllGuides() {
   try {
     const response = await fetch('/api/guides');
     if (!response.ok) {

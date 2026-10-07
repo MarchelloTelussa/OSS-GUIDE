@@ -77,6 +77,74 @@ router.post('/guides/:id/view', async (req, res) => {
     }
 });
 
+router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
+    const { id } = req.params;
+    const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
+
+    // 1. Validasi input sederhana
+    if (!title || !functionDesc || !importantNote || !videoUrl) {
+        return res.status(400).json({ error: 'Semua field utama wajib diisi' });
+    }
+
+    const client = await db.getClient ? await db.getClient() : db; 
+    // Catatan: Jika menggunakan pool PostgreSQL (pg), gunakan transaksi
+    try {
+        if (client.query) await client.query('BEGIN');
+
+        // 2. Update data utama pada tabel 'content'
+        const updateContentQuery = `
+            UPDATE content 
+            SET 
+                title = $1, 
+                function_desc = $2, 
+                important_note = $3, 
+                video_url = $4
+            WHERE id = $5
+            RETURNING id;
+        `;
+        const contentResult = await client.query(updateContentQuery, [
+            title, 
+            functionDesc, 
+            importantNote, 
+            videoUrl, 
+            id
+        ]);
+
+        if (contentResult.rows.length === 0) {
+            if (client.query) await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Guide tidak ditemukan' });
+        }
+
+        // 3. Hapus langkah-langkah (steps) lama milik guide ini
+        await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [id]);
+
+        // 4. Insert langkah-langkah (steps) baru jika ada
+        if (Array.isArray(steps) && steps.length > 0) {
+            for (let i = 0; i < steps.length; i++) {
+                const insertStepQuery = `
+                    INSERT INTO guide_steps (guide_id, step_order, step_description)
+                    VALUES ($1, $2, $3);
+                `;
+                await client.query(insertStepQuery, [id, i + 1, steps[i]]);
+            }
+        }
+
+        if (client.query) await client.query('COMMIT');
+
+        return res.status(200).json({ 
+            message: 'Guide berhasil diperbarui',
+            id 
+        });
+
+    } catch (error) {
+        if (client.query) await client.query('ROLLBACK');
+        console.error('Error updating guide:', error.stack);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+        if (client.release) client.release();
+    }
+});
+
 router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
     try {
         const { title, functionDesc, importantNote, videoUrl, steps } = req.body;

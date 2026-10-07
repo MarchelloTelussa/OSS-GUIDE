@@ -26,6 +26,8 @@ app.use((req, res, next) => {
     return res.redirect('/login.html');
   }
   if (req.path === '/add-guide.html' && req.user.role !== 'ITAdmin') return res.redirect('/');
+  if (req.path === '/edit-guide.html' && req.user.role !== 'ITAdmin') return res.redirect('/');
+
   next();
 });
 

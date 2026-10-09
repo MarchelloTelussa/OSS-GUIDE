@@ -116,6 +116,7 @@ stepsContainer.addEventListener('click', (e) => {
 if (editStepBtn) {
     editStepBtn.addEventListener('click', (e) => {
         e.preventDefault();
+    if (form.dataset.submitting === 'true') return; // cegah double submit
         addStepField();
     });
 }
@@ -185,7 +186,6 @@ async function uploadVideo(file) {
 // Event handler submit form
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (form.dataset.submitting === 'true') return; // cegah double submit
 
     if (!guideId) {
         showMessage('ID guide tidak ditemukan. Tidak dapat memperbarui data.', 'error');
@@ -207,11 +207,10 @@ form.addEventListener('submit', async (e) => {
         return;
     }
 
-    form.dataset.submitting = 'true';
     try {
         if (videoFile) {
             videoUrlValue = await uploadVideo(videoFile);
-            if (!videoUrlValue) { form.dataset.submitting = 'false'; return; }
+            if (!videoUrlValue) return;
         }
 
         const response = await fetch(`/api/guides/${guideId}`, {
@@ -237,12 +236,10 @@ form.addEventListener('submit', async (e) => {
             showMessage('Guide berhasil diedit! Mengalihkan...', 'success');
         } else {
             showMessage(result.error || 'Gagal mengedit guide', 'error');
-            form.dataset.submitting = 'false';
         }
     } catch (error) {
         console.error('Error:', error);
         showMessage('Terjadi kesalahan koneksi ke server', 'error');
-        form.dataset.submitting = 'false';
     }
 });
 

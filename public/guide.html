@@ -5,45 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GuidePage</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-<style>
-    :root {
-        --black : rgb(0, 0, 0);
-        --white : rgb(255, 255, 255);
-        --snowwhite : rgb(251, 251, 251);
-        --lightgrey : rgb(200, 206, 214);
-        --grey : rgb(108, 117, 125);
-        --darkgrey : rgb(71, 85, 105);
-        --blue : rgb(0, 123, 255);
-        --bg : rgb(248, 249, 250);
-    }
-    * {margin: 0; padding: 0; box-sizing: border-box;}
-    body {display: flex; flex-direction: column; min-height: 100vh; font-family: Arial, sans-serif;overflow-y: auto; overflow-behavior: none; background-color: var(--bg);}
+    <style>
+        :root {
+            --black : rgb(0, 0, 0);
+            --white : rgb(255, 255, 255);
+            --snowwhite : rgb(251, 251, 251);
+            --lightgrey : rgb(200, 206, 214);
+            --grey : rgb(108, 117, 125);
+            --darkgrey : rgb(71, 85, 105);
+            --blue : rgb(0, 123, 255);
+            --bg : rgb(248, 249, 250);
+        }
 
-    nav {display: flex; flex-direction: row; justify-content: flex-end; align-items: center; width: 100%; min-height: 45px; border-bottom: 2px solid var(--lightgrey); background-color: var(--white); padding: 0px 13px; position:sticky; top: 0;}
-    nav .nav_profile {display: flex; flex-direction: row; justify-content: space-around; gap: 10px;}
-    nav .nav_profile li {list-style: none;}
-    nav .nav_profile li a i{text-decoration: none;}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { display: flex; flex-direction: column; min-height: 100vh; font-family: Arial, sans-serif; background-color: var(--bg); overflow: hidden; }
 
-    main { display: flex; flex-direction: column; background-color: var(--snowwhite); flex: 1; /* Removed overflow-y: scroll to eliminate double scrollbars */ }
+        nav { position: fixed; top: 0; left: 0; display: flex; justify-content: flex-end; align-items: center; width: 100%; height: 45px; padding: 0 1rem; border-bottom: 2px solid var(--lightgrey); background-color: var(--white); z-index: 30; /* Paling atas */ }
+        nav .nav_profile { display: flex; gap: 15px; list-style: none; }
+        nav .nav_profile a { text-decoration: none; color: var(--black); font-size: 1.1rem; }
 
-    .guide-container { display: flex; flex-direction: column; margin: 0 100px; min-height: 100vh; background-color: var(--white); }
+        main { width: 100vw; height: calc(100vh - 45px); margin-top: 45px; /* Memberi ruang untuk Nav */ position: relative; }
+        .guide-wrapper { width: 100%; height: 100%; position: relative; }
 
-    .guide-header { display: flex; justify-content: space-between; align-items: center; background-color: var(--blue); padding: 15px 50px; }
+        .guide-header { position: fixed; top: 45px; /* Turun 45px agar tidak tertimpa Nav */ left: 0; width: 100%; height: 60px; /* Tentukan tinggi pasti header judul */ display: flex; justify-content: space-between; align-items: center; background: var(--blue); backdrop-filter: blur(8px); padding: 0 2rem; z-index: 20; }
+        .guide-title { color: var(--white); }
+        .guide-button { display: flex; gap: 1.5rem; align-items: center; }
+        .btn-edit a, .btn-back a { color: var(--white); text-decoration: none; font-size: 1.2rem; }
 
-    .guide-button { display: flex; gap: 2rem; align-items: center; color: var(--white); }
-    .btn-edit a { color: var(--white); text-decoration: none; }
-    .btn-delete a { color: var(--white); text-decoration: none; }
+        /* Style untuk tombol Eye (Tampilan Side Panel Toggle) */
+        .btn-view button, .btn-delete button { background: transparent; border: none; color: var(--white); font-size: 1.3rem; cursor: pointer; transition: transform 0.2s; }
 
-    .guide-title { color: var(--white); }
+        /* Video Fullscreen Setup */
+        .guide-video { position: absolute; top: 60px; /* Turun di bawah guide-header */ left: 0; width: 100vw; height: calc(100vh - 45px - 60px); /* Sisa tinggi layar setelah dipotong Nav (45px) & Header (60px) */ display: flex; justify-content: center; align-items: center; background-color: var(--black); }
 
-    .split { display: grid; grid-template-columns: 8.4fr 1.6fr; width: 100%; flex: 1; /* Automatically takes remaining space without adding extra 100vh */ }
+        /* Video tidak terpotong */
+        .guide-video video { width: 100%; height: 100%; object-fit: contain; /* Video tidak terpotong */ }
 
-    .split .left { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; border-right: 2px solid var(--black); background-color: var(--lightgrey); }
-    .split .left .guide-video video { width: 100%; }
+        /* Slide-in Right Side Panel */
+        .guide-info { position: fixed; top: 0; right: 0; width: 380px; max-width: 85vw; height: 100vh; background: rgba(0, 123, 255, 0.5); backdrop-filter: blur(15px); border-left: 1px solid var(--white); color: white; padding: 50px 30px 30px 30px; z-index: 100; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); overflow-y: auto; }
+        
+        .guide-info.open { transform: translateX(0); }
 
-    .split .right { display: flex; flex-direction: column; width: 100%; gap: 20px; background-color: var(--snowwhite); list-style: inside; padding: 1rem; /* Consolidated duplicate padding declarations */ min-height: 0; /* Allows nested content with overflow-y to scroll properly */ }
-    .split .right .guide-note { border-bottom: 2px solid var(--black); border-top: 2px solid var(--black); padding: 10px 0; }
-</style>
+        .close-btn { position: absolute; top: 15px; right: 20px; background: transparent; border: none; color: var(--lightgrey); font-size: 2rem; cursor: pointer; }
+        .close-btn:hover { color: var(--white); }
+
+        .guide-desc, .guide-note, .guide-steps { margin-bottom: 20px; }
+        .guide-steps ol { padding-left: 20px; margin-top: 10px; }
+        .guide-steps li { margin-bottom: 8px; line-height: 1.4; }
+
+        /* Backdrop Overlay */
+        .backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); opacity: 0; visibility: hidden; transition: opacity 0.3s; z-index: 90; }
+
+        .backdrop.active { opacity: 1; visibility: visible; }
+    </style>
 </head>
 
 <body>
@@ -71,9 +85,11 @@
             </li>
         </ul>
     </nav>
-    <main id="guide-container">
 
+    <main id="guide-container">
+        <!-- Dynamic content from JS -->
     </main>
+
     <script type="module" src="./js/guide.js"></script>
     <script type="module" src="./js/nav-auth.js"></script>
 </body>

@@ -97,7 +97,7 @@ function addStepField() {
     stepItem.className = 'step-item';
     stepItem.dataset.stepId = stepCount;
     stepItem.innerHTML = `
-        <input type="text" placeholder="Step ${stepCount}" class="step-input">
+        <input type="text" placeholder="Step" class="step-input">
         <button type="button" class="remove-step-btn">
             <i class="fa-solid fa-trash"></i>
         </button>

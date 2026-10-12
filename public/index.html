@@ -25,22 +25,29 @@
 
     main {display: flex; flex-direction: column; align-content: stretch; flex: 1; overflow-y: scroll;}
 
-    main .container_search {display: flex; flex-direction: column; align-items: center; padding: 60px 100px; gap: 30px; background-color: var(--blue); border-radius: 0 0 3% 3%;}
+    main .container_search {display: flex; flex-direction: row; justify-content: space-around; align-items: center; padding: 2rem 1rem; gap: 1rem; background-color: var(--blue); border-radius: 0 0 3% 3%;}
 
-    main .header_search {font-size: 2rem; color: var(--white);}
+    .header_search {font-size: 2rem; color: var(--white);}
 
-    main .input_search {display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; max-width: 600px; min-height: 48px; padding: 16px 32px; border-radius: 50px; background-color: white; box-sizing: border-box;}
-    main .input_search input {flex: 1; border: none; outline: none; font-size: 1.2rem; background: transparent;}
+    .input_search {display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; max-width: 600px; min-height: 48px; padding: 16px 32px; border-radius: 50px; background-color: white; box-sizing: border-box;}
+    .input_search input {flex: 1; border: none; outline: none; font-size: 1.2rem; background: transparent;}
     .error-state::placeholder {color: red;}
 
-    main .input_search button {width: 7%; border: none; background-color: transparent; font-size: 1.8rem;}
-    main .input_search button:hover {cursor: pointer; color: var(--blue)}
+    .input_search button {width: 7%; border: none; background-color: transparent; font-size: 1.8rem;}
+    .input_search button:hover {cursor: pointer; color: var(--blue)}
 
-    main .container_popular {display: flex; flex-direction: column; padding: 35px 50px; gap: 10px; font-size: 1rem;}
-    main .card_popular {display: flex; flex-direction: column; align-items: center;  gap: 20px;}
-    main .card_popular .guide_popular {display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 64px; padding: 1.25rem 1rem; text-decoration: none; border-radius: 15px; color: var(--black); border: 1px solid var(--black); background-color: var(--white); box-sizing: border-box;} main .card_popular .guide_popular h2 {margin: 0; font-size: 1.5rem;}
-    main .card_popular .guide_popular p {margin: 5px 0 0 0; color: var(--grey); font-size: 1rem;}
-    main .card_popular .guide_popular:hover {padding: 30px 25px; box-shadow: 5px 10px 5px #888888; transition: 0.2s ease-in-out; }
+    .container_guide {display: flex; flex-direction: column; margin: 35px 50px; gap: 10px; font-size: 1rem; border: 2px solid var(--black); background-color: red;}
+    .container_type {display: flex; flex-direction: row; align-items: center; justify-content: space-between; background-color: rgb(226, 179, 255, 1); padding: 0 1rem;}
+    .container_bttn {display: flex; flex-direction: row;}
+    
+    .button_type {padding: 0.4rem 1.5rem ;border: 2px dotted var(--black); background: none;}
+    .button_type:hover {background-color: rgba(158, 0, 254, 0.6);}
+    .button_add {}
+
+    .card_popular {display: flex; flex-direction: column; align-items: center;  gap: 20px;}
+    .card_popular .guide_popular {display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 64px; padding: 1.25rem 1rem; text-decoration: none; border-radius: 15px; color: var(--black); border: 1px solid var(--black); background-color: var(--white); box-sizing: border-box;} main .card_popular .guide_popular h2 {margin: 0; font-size: 1.5rem;}
+    .card_popular .guide_popular p {margin: 5px 0 0 0; color: var(--grey); font-size: 1rem;}
+    .card_popular .guide_popular:hover {padding: 30px 25px; box-shadow: 5px 10px 5px #888888; transition: 0.2s ease-in-out; }
 
 </style>
 </head>
@@ -72,7 +79,7 @@
     <main>
         <div class="container_search">
             <div class="header_search">
-                <h1> OSS USER GUIDE </h1>
+                <h1> Dashboard </h1>
             </div>
             <div class="input_search">
                 <input id="main_search_bar" type="text">
@@ -81,9 +88,16 @@
                 </button>
             </div>
         </div>
-        <div class="container_popular">
-            <h1>Popular Guides :</h1>
-            <div id="cardPopularCont" class="card_popular">
+        <div class="container_guide">
+            <div class="container_type">
+                <div  id ="contTypes" class="container_bttn">
+
+                </div>
+            <div id="bttnAdd" class="button_add">
+                <button>add</button>
+            </div>
+            </div>
+            <div id="cardGuide" class="card_popular">
 
             </div>
         </div>

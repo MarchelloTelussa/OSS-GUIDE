@@ -10,12 +10,15 @@ const router = express.Router();
 const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
 
-// Cek isi file (magic bytes) agar file non-video yang hanya diganti namanya ditolak
 function looksLikeVideo(buf, ext) {
     if (['.mp4', '.m4v', '.mov'].includes(ext)) return buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp';
     if (ext === '.webm') return buf.length > 4 && buf.readUInt32BE(0) === 0x1A45DFA3;
-    return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS'; // .ogv / .ogg
+    return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS';
 }
+
+// -------------------------------------------------------------
+// 1. ROUTE SPESIFIK (Wajib Diletakkan Sebelum Parameter Dinamis)
+// -------------------------------------------------------------
 
 router.get('/guides', async (req, res) => {
     try {
@@ -32,11 +35,67 @@ router.get('/guides', async (req, res) => {
         `;
         const { rows } = await db.query(queryText);
         res.json(rows);
-    }catch (error) {
+    } catch (error) {
         console.error('Error fetching guides:', error.stack);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+// ROUTE /guides/types DIPINDAHKAN KE SINI (Atas)
+router.get('/guides/types', async (req, res) => {
+    try {
+        const queryText = `
+        SELECT DISTINCT type
+        FROM content
+        WHERE type IS NOT NULL
+        ORDER BY type ASC;
+        `;
+        const { rows } = await db.query(queryText);
+        
+        const types = rows.map(row => row.type);
+        res.json(types);
+    } catch (error) {
+        console.error('Error fetching guide types:', error.stack);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// ROUTE FILTER TYPE DIBEDAKAN ENDPOINT-NYA DENGAN PREFIX /type/:type AGAR TIDAK BENTROK DENGAN /:id
+router.get('/guides/type/:type', async (req, res) => {
+    const { type } = req.params;
+    try {
+        const queryText = `
+        SELECT
+            c.id,
+            c.title,
+            c.important_note AS "importantNote",
+            c.function_desc AS "functionDesc",
+            c.video_url AS "videoUrl",
+            COALESCE (
+                json_agg(gs.step_description ORDER BY gs.step_order) FILTER (WHERE gs.step_description IS NOT NULL),
+                '[]'
+            ) AS steps,
+            c.type
+        FROM content c
+        LEFT JOIN guide_steps gs ON c.id = gs.guide_id
+        WHERE c.type = $1
+        GROUP BY c.id
+        ORDER BY c.id ASC;
+        `;
+        const { rows } = await db.query(queryText, [type]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide not found' });
+        }
+        res.json(rows); // Perbaikan: sebelumnya res.json() kosong
+    } catch (error) {
+        console.error('Error fetching guides by type:', error.stack);
+        res.status(500).json({ error: 'Internal Server Error' });
+    } 
+});
+
+// -------------------------------------------------------------
+// 2. ROUTE PARAMETER DINAMIS (:id)
+// -------------------------------------------------------------
 
 router.get('/guides/:id', async (req, res) => {
     const { id } = req.params;
@@ -55,7 +114,7 @@ router.get('/guides/:id', async (req, res) => {
             FROM content c
             LEFT JOIN guide_steps gs ON c.id = gs.guide_id
             WHERE c.id = $1
-			GROUP BY c.id;
+            GROUP BY c.id;
         `;
         const { rows } = await db.query(queryText, [id]);
         if (rows.length === 0) {
@@ -72,12 +131,12 @@ router.post('/guides/:id/view', async (req, res) => {
     const { id } = req.params;
     try {
         const result = await db.query(
-        'UPDATE content SET viewcount = viewcount + 1 WHERE id = $1 RETURNING viewcount',
-        [id]
+            'UPDATE content SET viewcount = viewcount + 1 WHERE id = $1 RETURNING viewcount',
+            [id]
         );
 
         if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Guide not found' });
+            return res.status(404).json({ error: 'Guide not found' });
         }
 
         res.json({ views: result.rows[0].viewcount });
@@ -91,17 +150,14 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
     const { id } = req.params;
     const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
-    // 1. Validasi input sederhana
     if (!title || !functionDesc || !importantNote || !videoUrl) {
         return res.status(400).json({ error: 'Semua field utama wajib diisi' });
     }
 
-    // Satu koneksi khusus agar BEGIN/COMMIT benar-benar satu transaksi
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
 
-        // 2. Update data utama pada tabel 'content'
         const updateContentQuery = `
             UPDATE content 
             SET 
@@ -125,10 +181,8 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
             return res.status(404).json({ error: 'Guide tidak ditemukan' });
         }
 
-        // 3. Hapus langkah-langkah (steps) lama milik guide ini
         await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [id]);
 
-        // 4. Insert langkah-langkah (steps) baru jika ada
         if (Array.isArray(steps)) {
             const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
             for (let i = 0; i < cleanSteps.length; i++) {
@@ -202,7 +256,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
         const __dirname = path.dirname(__filename);
         const videosDir = path.join(__dirname, '../public/videos');
 
-        // Create videos directory if it doesn't exist
         if (!fs.existsSync(videosDir)) {
             fs.mkdirSync(videosDir, { recursive: true });
         }
@@ -234,7 +287,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                     return res.status(400).json({ error: 'Invalid content type' });
                 }
 
-                // Extract boundary from content-type
                 const boundaryMatch = contentType.match(/boundary=([^;]+)/);
                 if (!boundaryMatch) {
                     return res.status(400).json({ error: 'Invalid boundary' });
@@ -272,7 +324,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                     });
                 }
 
-                // Save file with timestamp to avoid conflicts
                 const timestamp = Date.now();
                 const safeFilename = `${timestamp}${extension}`;
                 const filepath = path.join(videosDir, safeFilename);

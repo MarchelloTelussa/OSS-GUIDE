@@ -1,7 +1,8 @@
 let searchInput = document.querySelector('#main_search_bar');
 const searchButton = document.querySelector('#main_search_button');
 const typeContainer = document.querySelector('#contTypes');
-const cardContainer = document.querySelector('#cardGuide');
+const cardContainer = document.querySelector('#contCard');
+const btn = document.querySelector('#fullscreenBtn');
 
 let currentGuides = [];
 
@@ -9,7 +10,7 @@ function buildCard(cardData) {
   if (!cardData || typeof cardData !== 'object') return;
 
   const popCard = document.createElement('a');
-  popCard.classList.add('guide_popular');
+  popCard.classList.add('card_guide');
   popCard.href = `guide.html?id=${cardData.id}`;
   popCard.innerHTML = `
       <div>
@@ -69,16 +70,23 @@ async function getTypes() {
 }
 
 async function buildBttnType() {
-  if (!typeContainer) return; // Guard clause
+  if (!typeContainer) return;
 
   const types = await getTypes();
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentType = urlParams.get('type');
 
-  // Clear isi container sebelum render untuk mencegah duplicate button
   typeContainer.innerHTML = '';
 
   types.forEach(type => {
     const button = document.createElement('button');
     button.classList.add('button_type');
+    
+    // Tambahkan class 'active' jika tipe tombol cocok dengan URL
+    if (currentType && currentType.toLowerCase() === type.toLowerCase()) {
+      button.classList.add('active');
+    }
+
     button.textContent = type.toUpperCase();
     
     button.onclick = () => {
@@ -89,17 +97,13 @@ async function buildBttnType() {
   });
 }
 
-// Fungsi utama penjalan alur halaman
 async function init() {
-  // 1. Ambil parameter 'type' dari URL browser (misal: ?type=web)
   const urlParams = new URLSearchParams(window.location.search);
   const selectedType = urlParams.get('type');
 
-  // 2. Fetch data dari server
-  const guides = await loadGuides(selectedType);
+  currentGuides = await loadGuides(selectedType);
 
-  // 3. Render seluruh card ke container
-  renderCards(guides);
+  renderCards(currentGuides);
   buildBttnType();
 }
 
@@ -121,7 +125,7 @@ function performSearch() {
     }, 2500);
     return;
   }
-
+  
   // Filter HANYA dari currentGuides (kategori/type yang sedang di-load)
   const searchMatched = currentGuides.filter(item => {
     return item && item.title && item.title.toLowerCase().includes(searchQuery);
@@ -132,7 +136,6 @@ function performSearch() {
     searchInput.placeholder = "Not found";
     searchInput.classList.add('error-state');
     
-    // Tampilkan kembali semua data type aktif jika hasil cari kosong
     renderCards(currentGuides);
 
     setTimeout(() => {
@@ -140,13 +143,10 @@ function performSearch() {
       searchInput.classList.remove('error-state');
     }, 2500);
   } else {
-    // Urutkan berdasarkan views terbanyak jika perlu
-    searchMatched.sort((a, b) => (b.views || 0) - (a.views || 0));
     renderCards(searchMatched);
   }
 }
 
-// Event Listeners untuk Search
 if (searchButton) {
   searchButton.addEventListener('click', function(e) {
     e.preventDefault();

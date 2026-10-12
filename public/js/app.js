@@ -3,8 +3,22 @@ const searchButton = document.querySelector('#main_search_button');
 const typeContainer = document.querySelector('#contTypes');
 const cardContainer = document.querySelector('#contCard');
 const btn = document.querySelector('#fullscreenBtn');
+const bttnadd = document.querySelector('#bttnAdd a');
 
 let currentGuides = [];
+
+function updateAddButtonUrl() {
+  if (!bttnadd) return;
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentType = urlParams.get('type');
+
+  if (currentType) {
+    bttnadd.href = `add-guide.html?type=${encodeURIComponent(currentType)}`;
+  } else {
+    bttnadd.href = 'add-guide.html';
+  }
+}
 
 function buildCard(cardData) {
   if (!cardData || typeof cardData !== 'object') return;
@@ -74,7 +88,8 @@ async function buildBttnType() {
 
   const types = await getTypes();
   const urlParams = new URLSearchParams(window.location.search);
-  const currentType = urlParams.get('type');
+  
+  const currentType = urlParams.get('type') || 'web';
 
   typeContainer.innerHTML = '';
 
@@ -82,8 +97,7 @@ async function buildBttnType() {
     const button = document.createElement('button');
     button.classList.add('button_type');
     
-    // Tambahkan class 'active' jika tipe tombol cocok dengan URL
-    if (currentType && currentType.toLowerCase() === type.toLowerCase()) {
+    if (currentType.toLowerCase() === type.toLowerCase()) {
       button.classList.add('active');
     }
 
@@ -99,12 +113,20 @@ async function buildBttnType() {
 
 async function init() {
   const urlParams = new URLSearchParams(window.location.search);
-  const selectedType = urlParams.get('type');
+  let selectedType = urlParams.get('type');
+
+  if (!selectedType) {
+    selectedType = 'web';
+    
+    const newUrl = `${window.location.pathname}?type=${selectedType}`;
+    window.history.replaceState({ path: newUrl }, '', newUrl);
+  }
 
   currentGuides = await loadGuides(selectedType);
 
   renderCards(currentGuides);
   buildBttnType();
+  updateAddButtonUrl();
 }
 
 document.addEventListener('DOMContentLoaded', init);

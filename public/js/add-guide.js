@@ -3,6 +3,8 @@ const addStepBtn = document.querySelector('#addStepBtn');
 const stepsContainer = document.querySelector('#stepsContainer');
 const messageDiv = document.querySelector('#message');
 let stepCount = 0;
+const urlParams = new URLSearchParams(window.location.search);
+const currentType = urlParams.get('type');
 
 function addStepField() {
     stepCount++;
@@ -96,12 +98,13 @@ async function uploadVideo(file) {
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (form.dataset.submitting === 'true') return; // cegah double submit
+    if (form.dataset.submitting === 'true') return;
 
     const title = document.querySelector('#title').value.trim();
     const functionDesc = document.querySelector('#functionDesc').value.trim();
     const importantNote = document.querySelector('#importantNote').value.trim();
     const videoFile = document.querySelector('#videoFile').files[0];
+    const type = currentType.toLowerCase();
 
     const steps = Array.from(document.querySelectorAll('.step-input'))
         .map(input => input.value.trim())
@@ -120,7 +123,7 @@ form.addEventListener('submit', async (e) => {
         const response = await fetch('/api/guides', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, functionDesc, importantNote, videoUrl, steps })
+            body: JSON.stringify({ title, functionDesc, importantNote, videoUrl, steps, type })
         });
 
         if (response.status === 401 || response.status === 403) {
@@ -144,3 +147,10 @@ form.addEventListener('submit', async (e) => {
 });
 
 addStepField();
+document.addEventListener('DOMContentLoaded', () => {
+  const pageTitle = document.querySelector('#pageTitle');
+
+  if (pageTitle) {
+    pageTitle.textContent = `Add New Guide (${currentType.toUpperCase()})`;
+  }
+});

@@ -212,19 +212,19 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
 
 router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
     try {
-        const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
+        const { title, functionDesc, importantNote, videoUrl, steps, type } = req.body;
 
         if (!title || !functionDesc || !importantNote || !videoUrl) {
             return res.status(400).json({ error: 'Semua field wajib diisi' });
         }
 
         const guideQuery = `
-            INSERT INTO content (title, function_desc, important_note, video_url, viewcount)
-            VALUES ($1, $2, $3, $4, 0)
+            INSERT INTO content (title, function_desc, important_note, video_url, viewcount, type)
+            VALUES ($1, $2, $3, $4, 0, $5)
             RETURNING id
         `;
 
-        const guideResult = await db.query(guideQuery, [title, functionDesc, importantNote, videoUrl]);
+        const guideResult = await db.query(guideQuery, [title, functionDesc, importantNote, videoUrl, type]);
         const guideId = guideResult.rows[0].id;
 
         if (steps && Array.isArray(steps) && steps.length > 0) {

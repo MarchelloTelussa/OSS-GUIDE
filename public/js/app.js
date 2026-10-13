@@ -4,6 +4,7 @@ const typeContainer = document.querySelector('#contTypes');
 const cardContainer = document.querySelector('#contCard');
 const btn = document.querySelector('#fullscreenBtn');
 const bttnadd = document.querySelector('#bttnAdd a');
+const bttnmanage = document.querySelector('#bttnManage button');
 
 let currentGuides = [];
 
@@ -68,7 +69,7 @@ async function loadGuides(type = null) {
   }
 }
 
-//new
+
 async function getTypes() {
   try {
     const response = await fetch('/api/guides/types');
@@ -79,7 +80,7 @@ async function getTypes() {
     return types;
   } catch (error) {
     console.error('Gagal mengambil types: ', error);
-    return []; // Aman mengembalikan array kosong
+    return [];
   }
 }
 

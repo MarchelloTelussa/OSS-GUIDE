@@ -74,6 +74,7 @@
         align-items: center;
         z-index: 9999; /* Memastikan melayang di atas isi <main> */
     }
+    
 
     .manage_type_box {
         display: flex;
@@ -85,12 +86,22 @@
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         height: 90%;
     }
+    .delete {
+        width: 35%;
+        height: 30%;
+        background-color: whitesmoke;
+    }
 
     .manage_type_header {
         display: flex;
+        flex-direction: row;
         justify-content: space-between;
         align-items: center;
-        
+        font-weight: bold;
+    }
+
+    .manage_type_header button {
+        font-weight: bold;
     }
 
     .manage_type_body {
@@ -111,6 +122,90 @@
         display: flex;
         justify-content: flex-end;
         margin-top: 15px;
+    }
+
+    .manage_type_body {
+        width: 100%;
+        flex: 1;
+    }
+
+    .type-row {
+    border-bottom: 1px solid #e5e7eb;
+    background-color: snow;
+    transition: background-color 0.2s ease;
+    }
+
+    .type-row:hover {
+    background-color: #f9fafb;
+    }
+
+    .type-row td {
+    padding: 12px 16px;
+    vertical-align: middle;
+    font-size: 16px;
+    color: #374151;
+    }
+
+    /* Kolom Alignment */
+    .col-no {
+    width: 50px;
+    text-align: center;
+    font-weight: 600;
+    color: #6b7280;
+    }
+
+    .col-name {
+    font-weight: 500;
+    }
+
+    .col-action {
+    width: 140px;
+    text-align: right;
+    white-space: nowrap;
+    }
+
+    /* Tombol Aksi */
+    .btn-action {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 4px;
+    }
+
+    .btn-edit {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    }
+
+    .btn-edit:hover {
+    background-color: #bae6fd;
+    }
+
+    .btn-delete {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    }
+
+    .btn-delete:hover {
+    background-color: #fecaca;
+    }
+
+    /* State Loading, Empty, & Error */
+    .type-row-loading td,
+    .type-row-empty td,
+    .type-row-error td {
+    text-align: center;
+    padding: 24px 16px;
+    color: #6b7280;
+    font-style: italic;
+    }
+
+    .type-row-error td {
+    color: #dc2626;
     }
 
     @media (max-width: 1024px) { .container_card { grid-template-columns: repeat(2, 1fr); } }

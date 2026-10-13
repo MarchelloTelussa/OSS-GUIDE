@@ -124,26 +124,28 @@ router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res) =>
     const { type } = req.params;
     try {
         const queryText = `
-        DELETE FROM content
-        WHERE type = $1;
-        RETURNING id;
+            DELETE FROM content
+            WHERE type = $1
+            RETURNING id;
         `;
-    const { rows } = await db.query(queryText, [type]);
+        
+        const { rows } = await db.query(queryText, [type]);
 
         if (rows.length === 0) {
             return res.status(404).json({
                 error: 'Tidak ada guide dengan type tersebut'
             });
         }
-        res.json({
+
+        return res.json({
             message: 'Berhasil menghapus guide',
             deletedCount: rows.length,
             deletedIds: rows.map(row => row.id)
         });
 
-    } catch(error){
+    } catch (error) {
         console.error('Error deleting guides by type:', error.stack);
-        res.status(500).json({
+        return res.status(500).json({
             error: 'Internal Server Error'
         });
     }

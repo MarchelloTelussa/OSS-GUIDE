@@ -104,7 +104,7 @@ form.addEventListener('submit', async (e) => {
     const functionDesc = document.querySelector('#functionDesc').value.trim();
     const importantNote = document.querySelector('#importantNote').value.trim();
     const videoFile = document.querySelector('#videoFile').files[0];
-    const type = currentType.toLowerCase();
+    const type = currentType.toLowerCase().trim();
 
     const steps = Array.from(document.querySelectorAll('.step-input'))
         .map(input => input.value.trim())

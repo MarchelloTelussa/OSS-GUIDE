@@ -63,6 +63,56 @@
     .button_add a {color: black;}
     .button_Manage button {background: none; border: none; cursor: pointer;}
 
+    .container_manage_type {
+        position: fixed;
+        top: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5); /* Backdrop gelap */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999; /* Memastikan melayang di atas isi <main> */
+    }
+
+    .manage_type_box {
+        display: flex;
+        flex-direction: column;
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        width: 90%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        height: 90%;
+    }
+
+    .manage_type_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        
+    }
+
+    .manage_type_body {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .modal-close-btn {
+        background: transparent;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 15px;
+    }
+
     @media (max-width: 1024px) { .container_card { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 600px) { .container_card { grid-template-columns: 1fr; } }
 

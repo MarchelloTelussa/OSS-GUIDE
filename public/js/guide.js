@@ -74,7 +74,7 @@ async function loadGuidePage() {
             <div class="guide-note"> <p> <b>Important note:</b> ${data.importantNote} </p> </div>
             <div class="guide-steps"> 
                 <h4>Steps:</h4>
-                <ol>${stepsList.map(step => `<li>${step}</li>`).join("")}</ol> 
+                <ol>${stepsList.map(step => `<li>${step}</li>`).join("")}</ol>
             </div>
         </aside>
     </div>

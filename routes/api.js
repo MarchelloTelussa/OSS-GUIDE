@@ -60,6 +60,95 @@ router.get('/guides/types', async (req, res) => {
     }
 });
 
+
+router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res) => {
+    const { type } = req.params;
+    const { newType } = req.body;
+
+    const client = await db.getClient();
+
+    try {
+        if (!newType || !newType.trim()) {
+            return res.status(400).json({
+                error: 'newType tidak boleh kosong'
+            });
+        }
+
+        await client.query('BEGIN');
+
+        const queryText = `
+            UPDATE content
+            SET type = $2
+            WHERE type = $1
+            RETURNING id;
+        `;
+
+        const { rows } = await client.query(queryText, [
+            type,
+            newType.trim()
+        ]);
+
+        if (rows.length === 0) {
+            await client.query('ROLLBACK');
+
+            return res.status(404).json({
+                error: 'Type tidak ditemukan'
+            });
+        }
+
+        await client.query('COMMIT');
+
+        return res.status(200).json({
+            message: 'Berhasil mengubah type',
+            oldType: type,
+            newType: newType.trim(),
+            updatedCount: rows.length
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+
+        console.error('Error updating guide type:', error.stack);
+
+        return res.status(500).json({
+            error: 'Internal Server Error'
+        });
+
+    } finally {
+        client.release();
+    }
+});
+
+
+router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res) => {
+    const { type } = req.params;
+    try {
+        const queryText = `
+        DELETE FROM content
+        WHERE type = $1;
+        RETURNING id;
+        `;
+    const { rows } = await db.query(queryText, [type]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                error: 'Tidak ada guide dengan type tersebut'
+            });
+        }
+        res.json({
+            message: 'Berhasil menghapus guide',
+            deletedCount: rows.length,
+            deletedIds: rows.map(row => row.id)
+        });
+
+    } catch(error){
+        console.error('Error deleting guides by type:', error.stack);
+        res.status(500).json({
+            error: 'Internal Server Error'
+        });
+    }
+});
+
 // ROUTE FILTER TYPE DIBEDAKAN ENDPOINT-NYA DENGAN PREFIX /type/:type AGAR TIDAK BENTROK DENGAN /:id
 router.get('/guides/type/:type', async (req, res) => {
     const { type } = req.params;
@@ -78,7 +167,7 @@ router.get('/guides/type/:type', async (req, res) => {
             c.type
         FROM content c
         LEFT JOIN guide_steps gs ON c.id = gs.guide_id
-        WHERE c.type = $1
+        WHERE c.type = $1 AND TRIM(c.title) <> ''
         GROUP BY c.id
         ORDER BY c.id ASC;
         `;

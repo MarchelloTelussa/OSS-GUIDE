@@ -419,7 +419,6 @@ function handleDeleteType(typeToDelete) {
         method: 'DELETE'
       });
 
-      // Cek header content-type sebelum melakukan .json() untuk mencegah crash
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textError = await response.text();

@@ -151,7 +151,6 @@ router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res) =>
     }
 });
 
-// ROUTE FILTER TYPE DIBEDAKAN ENDPOINT-NYA DENGAN PREFIX /type/:type AGAR TIDAK BENTROK DENGAN /:id
 router.get('/guides/type/:type', async (req, res) => {
     const { type } = req.params;
     try {
@@ -215,6 +214,37 @@ router.get('/guides/:id', async (req, res) => {
     } catch (error) {
         console.error('Error fetching guide:', error.stack);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
+    const { id } = req.params;
+
+    if (isNaN(parseInt(id, 10))) {
+        return res.status(400).json({ error: 'ID tidak valid' });
+    }
+
+    try {
+        const queryText = `
+            DELETE FROM content
+            WHERE id = $1
+            RETURNING id;
+        `;
+
+        const { rows } = await db.query(queryText, [parseInt(id, 10)]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide not found' });
+        }
+
+        return res.json({
+            message: 'Guide berhasil dihapus',
+            deletedId: rows[0].id
+        });
+
+    } catch (error) {
+        console.error('Error deleting guide by ID:', error.stack);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 

@@ -67,60 +67,93 @@ router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res) => {
     const { type } = req.params;
     const { newType } = req.body;
 
+    if (!newType || !newType.trim()) {
+        return res.status(400).json({ error: 'newType tidak boleh kosong' });
+    }
+
+    const trimmedNewType = newType.trim();
+
+    // Tentukan nama folder safe untuk type lama dan baru
+    const safeOldType = type.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+    const safeNewType = trimmedNewType.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
     const client = await db.getClient();
 
     try {
-        if (!newType || !newType.trim()) {
-            return res.status(400).json({
-                error: 'newType tidak boleh kosong'
-            });
-        }
-
         await client.query('BEGIN');
 
-        const queryText = `
+        // 1. Update kolom `type` pada tabel content
+        const updateTypeQuery = `
             UPDATE content
             SET type = $2
             WHERE type = $1
-            RETURNING id;
+            RETURNING id, video_url;
         `;
 
-        const { rows } = await client.query(queryText, [
-            type,
-            newType.trim()
-        ]);
+        const { rows } = await client.query(updateTypeQuery, [type, trimmedNewType]);
 
         if (rows.length === 0) {
             await client.query('ROLLBACK');
-
-            return res.status(404).json({
-                error: 'Type tidak ditemukan'
-            });
+            return res.status(404).json({ error: 'Type tidak ditemukan' });
         }
+
+        // 2. Update seluruh string `video_url` yang mengandung folder type lama menjadi type baru
+        // Mengganti /videos/old_type/ menjadi /videos/new_type/
+        const oldPathPrefix = `/videos/${safeOldType}/`;
+        const newPathPrefix = `/videos/${safeNewType}/`;
+
+        const updateVideoUrlQuery = `
+            UPDATE content
+            SET video_url = REPLACE(video_url, $1, $2)
+            WHERE type = $3 AND video_url LIKE $4;
+        `;
+
+        await client.query(updateVideoUrlQuery, [
+            oldPathPrefix,
+            newPathPrefix,
+            trimmedNewType,
+            `${oldPathPrefix}%`
+        ]);
 
         await client.query('COMMIT');
 
+        // 3. Rename folder di filesystem dari public/videos/old_type ke public/videos/new_type
+        if (safeOldType !== safeNewType) {
+            const oldFolderPath = path.join(__dirname, '../public/videos', safeOldType);
+            const newFolderPath = path.join(__dirname, '../public/videos', safeNewType);
+
+            try {
+                if (fs.existsSync(oldFolderPath)) {
+                    // Pastikan folder induk /public/videos/ ada
+                    const videosParentDir = path.dirname(newFolderPath);
+                    if (!fs.existsSync(videosParentDir)) {
+                        fs.mkdirSync(videosParentDir, { recursive: true });
+                    }
+
+                    // Pindahkan/Rename seluruh folder type beserta isinya
+                    fs.renameSync(oldFolderPath, newFolderPath);
+                    console.log(`Folder type berhasil di-rename dari '${safeOldType}' ke '${safeNewType}'`);
+                }
+            } catch (fsErr) {
+                console.warn(`Gagal mengubah nama folder filesystem:`, fsErr.message);
+            }
+        }
+
         return res.status(200).json({
-            message: 'Berhasil mengubah type',
+            message: 'Berhasil mengubah type dan memperbarui path video serta folder',
             oldType: type,
-            newType: newType.trim(),
+            newType: trimmedNewType,
             updatedCount: rows.length
         });
 
     } catch (error) {
         await client.query('ROLLBACK');
-
         console.error('Error updating guide type:', error.stack);
-
-        return res.status(500).json({
-            error: 'Internal Server Error'
-        });
-
+        return res.status(500).json({ error: 'Internal Server Error' });
     } finally {
         client.release();
     }
 });
-
 
 router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res) => {
     const { type } = req.params;

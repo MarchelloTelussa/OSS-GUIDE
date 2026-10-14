@@ -99,7 +99,6 @@ function loadManageType() {
           <button id="modal-close-icon" class="modal-close-btn">&times;</button>
         </div>
 
-        <!-- FORM TAMBAH TIPE BARU -->
         <div class="add-type-wrapper" style="padding: 12px 16px; display: flex; gap: 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
           <input type="text" id="inputAddType" placeholder="Masukkan nama tipe baru..." style="flex: 1; padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 4px;" />
           <button id="btnAddNewType" style="padding: 6px 16px; background: #16a34a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">+ Tambah</button>
@@ -135,7 +134,6 @@ function loadManageType() {
       overlay.remove();
     }
 
-    // EVENT LISTENER TAMBAH TIPE BARU
     document.getElementById('btnAddNewType').onclick = async () => {
       const inputElem = document.getElementById('inputAddType');
       const newType = inputElem.value.trim().toLowerCase();
@@ -145,7 +143,6 @@ function loadManageType() {
         return;
       }
 
-      // 1. Cek Duplikasi (Case-Insensitive) dengan Tipe yang Sudah Ada
       const allRows = document.querySelectorAll('.type-row');
       let isDuplicate = false;
 
@@ -162,7 +159,6 @@ function loadManageType() {
         return;
       }
 
-      // 2. Kirim POST Request ke /api/guides dengan Dummy Data
       try {
         const payload = {
           title: ' ',
@@ -185,7 +181,6 @@ function loadManageType() {
         alert(`Berhasil menambahkan tipe baru "${newType}"!`);
         inputElem.value = '';
         
-        // Refresh tabel modal dan tombol filter di halaman utama
         loadTypeRow();
         buildBttnType();
 
@@ -248,7 +243,6 @@ async function loadTypeRow() {
       return;
     }
 
-    // Render baris tabel dengan data-action (bukan onclick)
     container.innerHTML = types.map((type, index) => {
       const typeName = typeof type === 'string' ? type : (type.name || type.type);
       return `

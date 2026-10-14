@@ -5,6 +5,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const router = express.Router();
 
 const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
@@ -41,7 +44,6 @@ router.get('/guides', async (req, res) => {
     }
 });
 
-// ROUTE /guides/types DIPINDAHKAN KE SINI (Atas)
 router.get('/guides/types', async (req, res) => {
     try {
         const queryText = `
@@ -176,7 +178,7 @@ router.get('/guides/type/:type', async (req, res) => {
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Guide not found' });
         }
-        res.json(rows); // Perbaikan: sebelumnya res.json() kosong
+        res.json(rows);
     } catch (error) {
         console.error('Error fetching guides by type:', error.stack);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -219,8 +221,9 @@ router.get('/guides/:id', async (req, res) => {
 
 router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
     const { id } = req.params;
+    const guideId = parseInt(id, 10);
 
-    if (isNaN(parseInt(id, 10))) {
+    if (isNaN(guideId)) {
         return res.status(400).json({ error: 'ID tidak valid' });
     }
 
@@ -228,13 +231,33 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         const queryText = `
             DELETE FROM content
             WHERE id = $1
-            RETURNING id;
+            RETURNING id, video_url AS "videoUrl";
         `;
 
-        const { rows } = await db.query(queryText, [parseInt(id, 10)]);
+        const { rows } = await db.query(queryText, [guideId]);
 
         if (rows.length === 0) {
-            return res.status(404).json({ error: 'Guide not found' });
+            return res.status(404).json({ error: 'Guide tidak ditemukan' });
+        }
+
+        const videoUrl = rows[0].videoUrl;
+
+        if (videoUrl) {
+            let cleanPath = videoUrl.trim();
+
+            cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+
+            const relativePath = cleanPath.startsWith('public/') ? cleanPath.replace('public/', '') : cleanPath;
+
+            const absoluteFilePath = path.join(__dirname, '../public', relativePath);
+
+            try {
+                // Gunakan unlinkSync tanpa await
+                fs.unlinkSync(absoluteFilePath);
+                console.log(`File video berhasil dihapus dari server: ${absoluteFilePath}`);
+            } catch (fileErr) {
+                console.warn(`Gagal menghapus file:`, fileErr.message);
+            }
         }
 
         return res.json({
@@ -243,7 +266,7 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting guide by ID:', error.stack);
+        console.error('Error deleting guide:', error.stack);
         return res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -373,8 +396,6 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
 
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
     try {
-        const __filename = fileURLToPath(import.meta.url);
-        const __dirname = path.dirname(__filename);
         const videosDir = path.join(__dirname, '../public/videos');
 
         if (!fs.existsSync(videosDir)) {

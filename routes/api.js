@@ -19,6 +19,15 @@ function looksLikeVideo(buf, ext) {
     return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS';
 }
 
+function getCategoryFromTitle(title = '') {
+    const lowerTitle = title.toLowerCase();
+    if (lowerTitle.includes('material')) return 'material';
+    if (lowerTitle.includes('ikr')) return 'ikr';
+    if (lowerTitle.includes('backbone')) return 'backbone';
+    if (lowerTitle.includes('project')) return 'project';
+    return 'misc';
+}
+
 // -------------------------------------------------------------
 // 1. ROUTE SPESIFIK (Wajib Diletakkan Sebelum Parameter Dinamis)
 // -------------------------------------------------------------
@@ -396,12 +405,6 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
 
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
     try {
-        const videosDir = path.join(__dirname, '../public/videos');
-
-        if (!fs.existsSync(videosDir)) {
-            fs.mkdirSync(videosDir, { recursive: true });
-        }
-
         const chunks = [];
         let received = 0;
         let tooLarge = false;
@@ -440,8 +443,21 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
 
                 let videoBuffer = null;
                 let videoFilename = '';
+                let typeParam = 'default';
+                let titleParam = '';
 
+                // Parsing multipart data untuk mengambil video, type, dan title
                 for (const part of parts) {
+                    if (part.includes('name="type"')) {
+                        const contentStart = part.indexOf('\r\n\r\n') + 4;
+                        const contentEnd = part.lastIndexOf('\r\n');
+                        typeParam = part.substring(contentStart, contentEnd).trim() || 'default';
+                    }
+                    if (part.includes('name="title"')) {
+                        const contentStart = part.indexOf('\r\n\r\n') + 4;
+                        const contentEnd = part.lastIndexOf('\r\n');
+                        titleParam = part.substring(contentStart, contentEnd).trim();
+                    }
                     if (part.includes('filename=')) {
                         const filenameMatch = part.match(/filename="([^"]+)"/);
                         if (filenameMatch) {
@@ -450,7 +466,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                             const contentEnd = part.lastIndexOf('\r\n');
                             const content = part.substring(contentStart, contentEnd);
                             videoBuffer = Buffer.from(content, 'binary');
-                            break;
                         }
                     }
                 }
@@ -466,13 +481,30 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                     });
                 }
 
+                // Tentukan folder kategori berdasarkan judul
+                const categoryFolder = getCategoryFromTitle(titleParam);
+
+                // Sanitasi nama folder type agar aman dari karakter aneh
+                const safeTypeFolder = typeParam.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
+                // Path direktori otomatis: /public/videos/<type>/<category>/
+                const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, categoryFolder);
+
+                // Buat folder secara otomatis jika belum ada
+                if (!fs.existsSync(targetDir)) {
+                    fs.mkdirSync(targetDir, { recursive: true });
+                }
+
                 const timestamp = Date.now();
                 const safeFilename = `${timestamp}${extension}`;
-                const filepath = path.join(videosDir, safeFilename);
+                const filepath = path.join(targetDir, safeFilename);
 
                 fs.writeFileSync(filepath, videoBuffer);
 
-                res.json({ videoPath: `/videos/${safeFilename}` });
+                // Simpan path URL relatif
+                const videoUrl = `/videos/${safeTypeFolder}/${categoryFolder}/${safeFilename}`;
+
+                res.json({ videoPath: videoUrl });
             } catch (error) {
                 console.error('Error processing upload:', error);
                 res.status(500).json({ error: 'Failed to process video upload' });

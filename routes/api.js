@@ -211,7 +211,8 @@ router.get('/guides/:id', async (req, res) => {
                 COALESCE(
                     json_agg(gs.step_description ORDER BY gs.step_order) FILTER (WHERE gs.step_description IS NOT NULL),
                     '[]'
-                ) AS steps
+                ) AS steps,
+                c.type
             FROM content c
             LEFT JOIN guide_steps gs ON c.id = gs.guide_id
             WHERE c.id = $1
@@ -311,6 +312,18 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        // 1. Ambil data guide lama untuk mengecek video_url yang lama
+        const oldGuideQuery = `SELECT video_url FROM content WHERE id = $1;`;
+        const oldGuideResult = await client.query(oldGuideQuery, [id]);
+
+        if (oldGuideResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Guide tidak ditemukan' });
+        }
+
+        const oldVideoUrl = oldGuideResult.rows[0].video_url;
+
+        // 2. Update konten guide di database
         const updateContentQuery = `
             UPDATE content 
             SET 
@@ -329,11 +342,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
             id
         ]);
 
-        if (contentResult.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Guide tidak ditemukan' });
-        }
-
+        // 3. Update steps
         await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [id]);
 
         if (Array.isArray(steps)) {
@@ -348,6 +357,21 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         }
 
         await client.query('COMMIT');
+
+        // 4. Jika videoUrl berubah (ada video baru), hapus file video lama di server
+        if (oldVideoUrl && oldVideoUrl !== videoUrl) {
+            // Hilangkan awalan /videos/ atau / jika ada, lalu sesuaikan ke folder /public
+            const relativePath = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
+            const oldFilePath = path.join(__dirname, '../public', relativePath);
+
+            fs.unlink(oldFilePath, (err) => {
+                if (err) {
+                    console.error(`Gagal menghapus video lama (${oldFilePath}):`, err.message);
+                } else {
+                    console.log(`Video lama berhasil dihapus: ${oldFilePath}`);
+                }
+            });
+        }
 
         return res.status(200).json({ 
             message: 'Guide berhasil diperbarui',

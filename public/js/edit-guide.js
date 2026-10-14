@@ -5,11 +5,14 @@ const videoUrl = document.querySelector('#videoPath');
 
 const form = document.querySelector('#editGuideForm');
 const stepsContainer = document.querySelector('#stepsContainer');
-const editStepBtn = document.querySelector('#editStepBtn'); // Pastikan selektor ini terdefinisi
+const editStepBtn = document.querySelector('#editStepBtn');
 const messageDiv = document.querySelector('#message');
 let stepCount = 0;
 
-// 1. Ambil guideId di luar agar bisa diakses oleh getSpecGuide() dan submit handler
+// Variable global untuk menyimpan type guide yang sedang diedit
+let currentType = '';
+
+// Ambil guideId dari URL parameter
 const urlParams = new URLSearchParams(window.location.search);
 const guideId = urlParams.get('id');
 
@@ -37,7 +40,6 @@ async function getSpecGuide() {
     }
 }
 
-// 2. Bungkus proses inisialisasi agar penanganan async lebih aman
 async function init() {
     const guideData = await getSpecGuide();
 
@@ -55,6 +57,10 @@ function loadData(data) {
     functionDesc.value = data.functionDesc || '';
     importantNote.value = data.importantNote || '';
     videoUrl.value = data.videoUrl || '';
+    
+    // Simpan type ke variabel global
+    currentType = data.type || '';
+
     if (data.videoUrl) {
         document.querySelector('#videoCurrent').textContent =
             `Video saat ini: ${data.videoUrl}. Pilih file baru untuk menggantinya (kosongkan jika tidak ingin mengganti).`;
@@ -116,7 +122,7 @@ stepsContainer.addEventListener('click', (e) => {
 if (editStepBtn) {
     editStepBtn.addEventListener('click', (e) => {
         e.preventDefault();
-    if (form.dataset.submitting === 'true') return; // cegah double submit
+        if (form.dataset.submitting === 'true') return;
         addStepField();
     });
 }
@@ -146,7 +152,6 @@ if (btn) {
     });
 }
 
-// Upload file video ke server (disalin ke public/videos), mengembalikan path-nya
 const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
 
@@ -159,7 +164,8 @@ function validateVideoFile(file) {
     return null;
 }
 
-async function uploadVideo(file) {
+// Fungsi uploadVideo menerima file, title, dan type
+async function uploadVideo(file, title, type) {
     const invalid = validateVideoFile(file);
     if (invalid) {
         showMessage(invalid, 'error');
@@ -167,6 +173,8 @@ async function uploadVideo(file) {
     }
     const formData = new FormData();
     formData.append('video', file);
+    formData.append('title', title);
+    formData.append('type', type);
 
     const response = await fetch('/api/upload-video', { method: 'POST', body: formData });
 
@@ -209,7 +217,8 @@ form.addEventListener('submit', async (e) => {
 
     try {
         if (videoFile) {
-            videoUrlValue = await uploadVideo(videoFile);
+            // Mengirimkan file, judul baru, dan tipe ke uploadVideo
+            videoUrlValue = await uploadVideo(videoFile, titleValue, currentType);
             if (!videoUrlValue) return;
         }
 

@@ -80,8 +80,9 @@ async function loadGuidePage() {
     </div>
     `;
 
-    // Inisialisasi event listener setelah elemen selesai di-render ke DOM
+    // Inisialisasi event listener setelah elemen dimasukkan ke DOM
     setupPanelEvents();
+    setupDeleteEvent();
 }
 
 // Fungsi Event Listener untuk Side Panel
@@ -112,6 +113,17 @@ function setupPanelEvents() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closePanel();
     });
+}
+
+// Attach event listener ke tombol Delete secara dinamis
+function setupDeleteEvent() {
+    const deleteBtn = document.querySelector('#deleteGuideBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            deleteGuide();
+        });
+    }
 }
 
 async function trackGuideView(guideId) {
@@ -149,6 +161,66 @@ async function getSpecGuide() {
         console.error('Error fetching specific guide:', error);
     }
     return specData;
+}
+
+function deleteGuide() {
+    // Karena 'data' global sudah menyimpan objek guide aktif dari getSpecGuide()
+    if (!data || !data.id) {
+        console.log('Informasi guide tidak ditemukan');
+        return;
+    }
+
+    // Cegah modal duplikat
+    if (document.getElementById('confDelete')) return;
+
+    // Buat modal overlay
+    const overlay = document.createElement("div");
+    overlay.id = 'confDelete';
+    overlay.className = 'backdrop confirmdel';
+
+    overlay.innerHTML = `
+      <div class="confirm_delete_box">
+        <div class="confirm_delete_header">
+          <h3>Konfirmasi Delete Guide</h3>
+          <p>Apakah anda yakin ingin menghapus guide <b>${data.title}</b>?</p>
+        </div>
+        <div class="button_group">
+            <button id="delConfirm" class="button_delete">Ya, Hapus</button>
+            <button id="delCancel" class="button_cancel">Batal</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+
+    const closeSubModal = () => overlay.remove();
+    document.getElementById('delCancel').onclick = closeSubModal;
+
+    // Eksekusi DELETE request
+    document.getElementById('delConfirm').onclick = async () => {
+        try {
+            const response = await fetch(`/api/guides/${data.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Gagal menghapus guide (Status: ${response.status})`);
+            }
+
+            const result = await response.json();
+            alert(result.message || 'Guide berhasil dihapus');
+            
+            closeSubModal();
+            window.location.href = '/index.html'; 
+        } catch (error) {
+            console.error('Error deleting guide:', error);
+            alert(`Error: ${error.message}`);
+        }
+    };
 }
 
 async function init(){

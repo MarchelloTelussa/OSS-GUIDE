@@ -39,7 +39,7 @@ router.post('/login', async (req, res, next) => {
         res.json({ username: user.username, role: user.role });
 
     } catch (error) {
-        next(error);
+        next(error); // Lempar ke errorHandler terpusat
     }
 });
 
@@ -54,7 +54,7 @@ router.post('/logout', async (req, res, next) => {
 
         const sessionId = cookies[COOKIE_NAME];
 
-        // HAPUS SESI DARI DATABASE
+        // Hapus sesi dari database
         if (sessionId) {
             await destroySession(sessionId);
         }
@@ -62,12 +62,16 @@ router.post('/logout', async (req, res, next) => {
         res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
         res.json({ message: 'Logged out' });
     } catch (error) {
-        next(error);
+        next(error); // Lempar ke errorHandler terpusat
     }
 });
 
-router.get('/me', requireAuth(), (req, res) => {
-    res.json({ id: req.user.id, username: req.user.username, role: req.user.role });
+router.get('/me', requireAuth(), (req, res, next) => {
+    try {
+        res.json({ id: req.user.id, username: req.user.username, role: req.user.role });
+    } catch (error) {
+        next(error); // Lempar ke errorHandler terpusat
+    }
 });
 
 export default router;

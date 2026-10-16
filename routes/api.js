@@ -23,7 +23,7 @@ function looksLikeVideo(buf, ext) {
 // 1. ROUTE SPESIFIK (Wajib Diletakkan Sebelum Parameter Dinamis)
 // -------------------------------------------------------------
 
-router.get('/guides', async (req, res) => {
+router.get('/guides', async (req, res, next) => {
     try {
         const queryText = `
         SELECT
@@ -39,12 +39,11 @@ router.get('/guides', async (req, res) => {
         const { rows } = await db.query(queryText);
         res.json(rows);
     } catch (error) {
-        console.error('Error fetching guides:', error.stack);
-        res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     }
 });
 
-router.get('/guides/types', async (req, res) => {
+router.get('/guides/types', async (req, res, next) => {
     try {
         const queryText = `
         SELECT DISTINCT type
@@ -57,13 +56,11 @@ router.get('/guides/types', async (req, res) => {
         const types = rows.map(row => row.type);
         res.json(types);
     } catch (error) {
-        console.error('Error fetching guide types:', error.stack);
-        res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     }
 });
 
-
-router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res) => {
+router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res, next) => {
     const { type } = req.params;
     const { newType } = req.body;
 
@@ -98,7 +95,6 @@ router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res) => {
         }
 
         // 2. Update seluruh string `video_url` yang mengandung folder type lama menjadi type baru
-        // Mengganti /videos/old_type/ menjadi /videos/new_type/
         const oldPathPrefix = `/videos/${safeOldType}/`;
         const newPathPrefix = `/videos/${safeNewType}/`;
 
@@ -124,13 +120,11 @@ router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res) => {
 
             try {
                 if (fs.existsSync(oldFolderPath)) {
-                    // Pastikan folder induk /public/videos/ ada
                     const videosParentDir = path.dirname(newFolderPath);
                     if (!fs.existsSync(videosParentDir)) {
                         fs.mkdirSync(videosParentDir, { recursive: true });
                     }
 
-                    // Pindahkan/Rename seluruh folder type beserta isinya
                     fs.renameSync(oldFolderPath, newFolderPath);
                     console.log(`Folder type berhasil di-rename dari '${safeOldType}' ke '${safeNewType}'`);
                 }
@@ -148,14 +142,13 @@ router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res) => {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Error updating guide type:', error.stack);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     } finally {
         client.release();
     }
 });
 
-router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res) => {
+router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res, next) => {
     const { type } = req.params;
     try {
         const queryText = `
@@ -193,14 +186,11 @@ router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res) =>
         });
 
     } catch (error) {
-        console.error('Error deleting guides by type:', error.stack);
-        return res.status(500).json({
-            error: 'Internal Server Error'
-        });
+        next(error);
     }
 });
 
-router.get('/guides/type/:type', async (req, res) => {
+router.get('/guides/type/:type', async (req, res, next) => {
     const { type } = req.params;
     try {
         const queryText = `
@@ -227,8 +217,7 @@ router.get('/guides/type/:type', async (req, res) => {
         }
         res.json(rows);
     } catch (error) {
-        console.error('Error fetching guides by type:', error.stack);
-        res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     } 
 });
 
@@ -236,7 +225,7 @@ router.get('/guides/type/:type', async (req, res) => {
 // 2. ROUTE PARAMETER DINAMIS (:id)
 // -------------------------------------------------------------
 
-router.get('/guides/:id', async (req, res) => {
+router.get('/guides/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
         const queryText = `
@@ -262,12 +251,11 @@ router.get('/guides/:id', async (req, res) => {
         }
         res.json(rows[0]);
     } catch (error) {
-        console.error('Error fetching guide:', error.stack);
-        res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     }
 });
 
-router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
+router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
 
@@ -296,22 +284,19 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
             const relativePath = cleanPath.startsWith('public/') ? cleanPath.replace('public/', '') : cleanPath;
 
             const absoluteFilePath = path.join(__dirname, '../public', relativePath);
-            const titleFolderPath = path.dirname(absoluteFilePath); // Folder khusus judul guide
+            const titleFolderPath = path.dirname(absoluteFilePath);
 
             try {
-                // Hapus file video
                 if (fs.existsSync(absoluteFilePath)) {
                     fs.unlinkSync(absoluteFilePath);
                     console.log(`File video berhasil dihapus: ${absoluteFilePath}`);
                 }
 
-                // Hapus folder khusus judul guide (dan isi pendukungnya jika ada)
                 if (fs.existsSync(titleFolderPath)) {
                     fs.rmSync(titleFolderPath, { recursive: true, force: true });
                     console.log(`Folder guide berhasil dihapus: ${titleFolderPath}`);
                 }
 
-                // Opsional: Hapus folder kategori di atasnya jika sudah kosong
                 const categoryFolderPath = path.dirname(titleFolderPath);
                 if (fs.existsSync(categoryFolderPath) && fs.readdirSync(categoryFolderPath).length === 0) {
                     fs.rmdirSync(categoryFolderPath);
@@ -328,12 +313,11 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error deleting guide:', error.stack);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     }
 });
 
-router.post('/guides/:id/view', async (req, res) => {
+router.post('/guides/:id/view', async (req, res, next) => {
     const { id } = req.params;
     try {
         const result = await db.query(
@@ -347,12 +331,11 @@ router.post('/guides/:id/view', async (req, res) => {
 
         res.json({ views: result.rows[0].viewcount });
     } catch (error) {
-        console.error('Error updating view count:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 });
 
-router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
+router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
@@ -384,25 +367,19 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
             const oldFolderPath = path.dirname(oldFilePath);
             const fileName = path.basename(oldFilePath);
 
-            // Sanitasi type dan title baru
             const safeTypeFolder = (oldData.type || 'default').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
             const newSafeTitleFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
 
-            // Folder dan File Path Tujuan Baru (langsung /videos/<type>/<title>/)
             const newFolderPath = path.join(__dirname, '../public/videos', safeTypeFolder, newSafeTitleFolder);
             const newFilePath = path.join(newFolderPath, fileName);
 
-            // Cek ketersediaan file lama di server
             if (fs.existsSync(oldFilePath)) {
-                // Buat folder baru jika belum ada
                 if (!fs.existsSync(newFolderPath)) {
                     fs.mkdirSync(newFolderPath, { recursive: true });
                 }
 
-                // Pindahkan file video ke folder lokasi baru
                 fs.renameSync(oldFilePath, newFilePath);
 
-                // Hapus folder lama (dan induknya jika kosong)
                 try {
                     if (fs.existsSync(oldFolderPath)) {
                         fs.rmSync(oldFolderPath, { recursive: true, force: true });
@@ -411,7 +388,6 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
                     console.warn('Gagal membersihkan folder lama:', e.message);
                 }
 
-                // Set URL video baru untuk disimpan ke Database
                 finalVideoUrl = `/videos/${safeTypeFolder}/${newSafeTitleFolder}/${fileName}`;
             }
         }
@@ -472,14 +448,13 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res) => {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Error updating guide:', error.stack);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        next(error);
     } finally {
         client.release();
     }
 });
 
-router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
+router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const { title, functionDesc, importantNote, videoUrl, steps, type } = req.body;
 
@@ -514,12 +489,11 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res) => {
             message: 'Guide created successfully'
         });
     } catch (error) {
-        console.error('Error creating guide:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 });
 
-router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
+router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const chunks = [];
         let received = 0;
@@ -562,7 +536,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                 let typeParam = 'default';
                 let titleParam = 'untitled';
 
-                // Parsing multipart data
                 for (const part of parts) {
                     if (part.includes('name="type"')) {
                         const contentStart = part.indexOf('\r\n\r\n') + 4;
@@ -597,14 +570,11 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
                     });
                 }
 
-                // Sanitasi nama type & title agar aman untuk nama folder di OS
                 const safeTypeFolder = typeParam.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
                 const safeTitleFolder = titleParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
 
-                // Path direktori langsung: /public/videos/<type>/<safeTitleFolder>/
                 const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
-                // Buat folder secara otomatis jika belum ada
                 if (!fs.existsSync(targetDir)) {
                     fs.mkdirSync(targetDir, { recursive: true });
                 }
@@ -615,18 +585,15 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res) => {
 
                 fs.writeFileSync(filepath, videoBuffer);
 
-                // Path URL relatif yang tersimpan di DB
                 const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
 
                 res.json({ videoPath: videoUrl });
             } catch (error) {
-                console.error('Error processing upload:', error);
-                res.status(500).json({ error: 'Failed to process video upload' });
+                next(error);
             }
         });
     } catch (error) {
-        console.error('Error uploading video:', error);
-        res.status(500).json({ error: 'Server error' });
+        next(error);
     }
 });
 

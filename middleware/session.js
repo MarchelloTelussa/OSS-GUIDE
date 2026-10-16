@@ -1,7 +1,6 @@
 // lib/session.js
 import crypto from 'crypto';
 import db from '../db.js';
-
 export const COOKIE_NAME = 'oss_session';
 const MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 jam
 
@@ -56,26 +55,29 @@ function parseCookies(header = '') {
     );
 }
 
-// 5. Session Middleware (Async)
 export async function sessionMiddleware(req, res, next) {
-    const cookies = parseCookies(req.headers.cookie);
-    const sessionId = cookies[COOKIE_NAME];
+    try {
+        const cookies = parseCookies(req.headers.cookie);
+        const sessionId = cookies[COOKIE_NAME];
 
-    if (sessionId) {
-        req.sessionId = sessionId;
-        req.user = await readSession(sessionId);
-    } else {
-        req.user = null;
+        if (sessionId) {
+            req.sessionId = sessionId;
+            req.user = await readSession(sessionId);
+        } else {
+            req.user = null;
+        }
+
+        next();
+    } catch (error) {
+        // Oper error database ke errorHandler terpusat
+        next(error);
     }
-    
-    next();
 }
 
 // 6. Auth Protection Guard
 export function requireAuth(role) {
     return (req, res, next) => {
         if (!req.user) {
-            // Jika request berasal dari API fetch/AJAX
             return res.status(401).json({ 
                 error: 'Sesi Anda telah berakhir atau diakhiri karena login di perangkat lain.',
                 code: 'SESSION_TERMINATED'
@@ -88,22 +90,20 @@ export function requireAuth(role) {
     };
 }
 
+// 7. Hapus Seluruh Sesi Lama User
+export async function destroyAllUserSessions(userId) {
+    if (!userId) return;
+    
+    const cleanUserId = parseInt(userId, 10);
+    const result = await db.query('DELETE FROM sessions WHERE user_id = $1', [cleanUserId]);
+    console.log(`[DEBUG] Menghapus ${result.rowCount} sesi lama milik user_id: ${cleanUserId}`);
+}
+
+// Cleanup otomatis background task
 setInterval(async () => {
     try {
         await db.query('DELETE FROM sessions WHERE expires_at < NOW()');
     } catch (err) {
-        console.error('Gagal membersihkan sesi kedaluwarsa:', err);
+        console.error('[CLEANUP ERROR] Gagal membersihkan sesi kedaluwarsa:', err.message);
     }
 }, 60 * 60 * 1000);
-
-export async function destroyAllUserSessions(userId) {
-    if (!userId) return;
-    
-    try {
-        const cleanUserId = parseInt(userId, 10);
-        const result = await db.query('DELETE FROM sessions WHERE user_id = $1', [cleanUserId]);
-        console.log(`[DEBUG] Menghapus ${result.rowCount} sesi lama milik user_id: ${cleanUserId}`);
-    } catch (err) {
-        console.error('[ERROR] Gagal hapus sesi lama:', err);
-    }
-}

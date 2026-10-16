@@ -1,6 +1,6 @@
 import express from 'express';
 import db from '../db.js';
-import { requireAuth } from '../lib/session.js';
+import { requireAuth } from '../middleware/session.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

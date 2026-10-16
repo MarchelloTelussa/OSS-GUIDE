@@ -2,7 +2,7 @@
 // Role yang dipakai aplikasi: ITAdmin (boleh membuat guide) atau user
 import 'dotenv/config';
 import db from '../db.js';
-import { hashPassword } from '../lib/password.js';
+import { hashPassword } from '../middleware/password.js';
 
 const [username, password, role = 'user'] = process.argv.slice(2);
 

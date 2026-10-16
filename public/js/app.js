@@ -515,3 +515,14 @@ if (btn) {
     }
   });
 }
+
+setInterval(async () => {
+    try {
+        const res = await db.query('DELETE FROM sessions WHERE expires_at < NOW()');
+        if (res.rowCount > 0) {
+            console.log(`[CLEANUP] Berhasil membersihkan ${res.rowCount} sesi kadaluwarsa.`);
+        }
+    } catch (err) {
+        console.error('[CLEANUP ERROR]', err);
+    }
+}, 30 * 60 * 1000);

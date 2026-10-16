@@ -3,7 +3,7 @@ import path from 'path';
 import express from 'express';
 import apiRouter from './routes/api.js';
 import authRouter from './routes/auth.js';
-import { sessionMiddleware } from './lib/session.js';
+import { sessionMiddleware } from './middleware/session.js';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);

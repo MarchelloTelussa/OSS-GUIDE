@@ -6,7 +6,17 @@ const manageTypeButton = document.querySelector('#bttnManage');
 export async function getUserInfo() {
     try {
         const response = await fetch('/api/auth/me');
-        if (!response.ok) throw new Error('Not authenticated');
+
+        if (!response.ok) {
+            // Jika status 401 (sesi hangus/di-kick), lempar URL dengan query parameter
+            if (response.status === 401) {
+                window.location.href = 'login.html?reason=kicked';
+                return null;
+            }
+            window.location.href = 'login.html';
+            return null;
+        }
+
         const user = await response.json();
 
         if (userLink) {
@@ -26,8 +36,9 @@ export async function getUserInfo() {
             if (button) button.remove();
             else manageTypeButton.remove();
         }
-        return user; // Mengembalikan data user agar bisa digunakan di fungsi lain
-    } catch {
+        return user;
+    } catch (err) {
+        // Fallback jika terjadi Network Error / Server Down
         window.location.href = 'login.html';
         return null;
     }

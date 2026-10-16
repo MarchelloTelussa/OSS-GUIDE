@@ -13,6 +13,27 @@ const router = express.Router();
 const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
 
+const taskLocks = new Map();
+
+function enqueueTask(key, taskFn) {
+    const lockKey = String(key);
+    const previousTask = taskLocks.get(lockKey) || Promise.resolve();
+
+    const currentTask = previousTask
+        .then(() => taskFn())
+        .catch((err) => {
+            throw err;
+        })
+        .finally(() => {
+            if (taskLocks.get(lockKey) === currentTask) {
+                taskLocks.delete(lockKey);
+            }
+        });
+
+    taskLocks.set(lockKey, currentTask);
+    return currentTask;
+}
+
 function looksLikeVideo(buf, ext) {
     if (['.mp4', '.m4v', '.mov'].includes(ext)) return buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp';
     if (ext === '.webm') return buf.length > 4 && buf.readUInt32BE(0) === 0x1A45DFA3;
@@ -150,16 +171,23 @@ router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res, next) 
 
 router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res, next) => {
     const { type } = req.params;
+
+    // Gunakan db.getClient() sesuai export di db.js
+    const client = await db.getClient();
+
     try {
+        await client.query('BEGIN');
+
         const queryText = `
             DELETE FROM content
             WHERE type = $1
             RETURNING id;
         `;
         
-        const { rows } = await db.query(queryText, [type]);
+        const { rows } = await client.query(queryText, [type]);
 
         if (rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({
                 error: 'Tidak ada guide dengan type tersebut'
             });
@@ -179,6 +207,8 @@ router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res, ne
             console.warn(`Gagal menghapus folder type:`, dirErr.message);
         }
 
+        await client.query('COMMIT');
+
         return res.json({
             message: 'Berhasil menghapus guide dan folder type',
             deletedCount: rows.length,
@@ -186,7 +216,10 @@ router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res, ne
         });
 
     } catch (error) {
+        await client.query('ROLLBACK');
         next(error);
+    } finally {
+        client.release();
     }
 });
 
@@ -263,58 +296,71 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         return res.status(400).json({ error: 'ID tidak valid' });
     }
 
-    try {
-        const queryText = `
-            DELETE FROM content
-            WHERE id = $1
-            RETURNING id, video_url AS "videoUrl";
-        `;
+    enqueueTask(guideId, async () => {
+        const client = await db.getClient();
 
-        const { rows } = await db.query(queryText, [guideId]);
+        try {
+            await client.query('BEGIN');
 
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Guide tidak ditemukan' });
-        }
+            const queryText = `
+                DELETE FROM content
+                WHERE id = $1
+                RETURNING id, video_url AS "videoUrl";
+            `;
 
-        const videoUrl = rows[0].videoUrl;
+            const { rows } = await client.query(queryText, [guideId]);
 
-        if (videoUrl) {
-            let cleanPath = videoUrl.trim();
-            cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-            const relativePath = cleanPath.startsWith('public/') ? cleanPath.replace('public/', '') : cleanPath;
-
-            const absoluteFilePath = path.join(__dirname, '../public', relativePath);
-            const titleFolderPath = path.dirname(absoluteFilePath);
-
-            try {
-                if (fs.existsSync(absoluteFilePath)) {
-                    fs.unlinkSync(absoluteFilePath);
-                    console.log(`File video berhasil dihapus: ${absoluteFilePath}`);
-                }
-
-                if (fs.existsSync(titleFolderPath)) {
-                    fs.rmSync(titleFolderPath, { recursive: true, force: true });
-                    console.log(`Folder guide berhasil dihapus: ${titleFolderPath}`);
-                }
-
-                const categoryFolderPath = path.dirname(titleFolderPath);
-                if (fs.existsSync(categoryFolderPath) && fs.readdirSync(categoryFolderPath).length === 0) {
-                    fs.rmdirSync(categoryFolderPath);
-                    console.log(`Folder kategori kosong dihapus: ${categoryFolderPath}`);
-                }
-            } catch (fileErr) {
-                console.warn(`Gagal menghapus file/folder video:`, fileErr.message);
+            if (rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ error: 'Guide tidak ditemukan' });
             }
+
+            const videoUrl = rows[0].videoUrl;
+
+            if (videoUrl) {
+                let cleanPath = videoUrl.trim();
+                cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                const relativePath = cleanPath.startsWith('public/') ? cleanPath.replace('public/', '') : cleanPath;
+
+                const absoluteFilePath = path.join(__dirname, '../public', relativePath);
+                const titleFolderPath = path.dirname(absoluteFilePath);
+
+                try {
+                    if (fs.existsSync(absoluteFilePath)) {
+                        fs.unlinkSync(absoluteFilePath);
+                    }
+
+                    // Hapus folder guide sampai bersih
+                    if (fs.existsSync(titleFolderPath)) {
+                        fs.rmSync(titleFolderPath, { recursive: true, force: true });
+                        console.log(`Folder guide berhasil dibersihkan: ${titleFolderPath}`);
+                    }
+
+                    // Hapus folder kategori jika sudah tidak ada isinya lagi
+                    const categoryFolderPath = path.dirname(titleFolderPath);
+                    if (fs.existsSync(categoryFolderPath) && fs.readdirSync(categoryFolderPath).length === 0) {
+                        fs.rmdirSync(categoryFolderPath);
+                        console.log(`Folder kategori kosong dihapus: ${categoryFolderPath}`);
+                    }
+                } catch (fileErr) {
+                    console.warn(`Gagal menghapus file/folder video:`, fileErr.message);
+                }
+            }
+
+            await client.query('COMMIT');
+
+            res.json({
+                message: 'Guide berhasil dihapus',
+                deletedId: rows[0].id
+            });
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
         }
-
-        return res.json({
-            message: 'Guide berhasil dihapus',
-            deletedId: rows[0].id
-        });
-
-    } catch (error) {
-        next(error);
-    }
+    }).catch(next);
 });
 
 router.post('/guides/:id/view', async (req, res, next) => {
@@ -337,121 +383,142 @@ router.post('/guides/:id/view', async (req, res, next) => {
 
 router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
-    const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
+    const guideId = parseInt(id, 10);
 
-    if (!title || !functionDesc || !importantNote || !videoUrl) {
-        return res.status(400).json({ error: 'Semua field utama wajib diisi' });
+    if (isNaN(guideId)) {
+        return res.status(400).json({ error: 'ID tidak valid' });
     }
 
-    const client = await db.getClient();
-    try {
-        await client.query('BEGIN');
+    enqueueTask(`guide_${guideId}`, async () => {
+        const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
-        // 1. Ambil data guide lama
-        const oldGuideQuery = `SELECT title, type, video_url FROM content WHERE id = $1;`;
-        const oldGuideResult = await client.query(oldGuideQuery, [id]);
-
-        if (oldGuideResult.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Guide tidak ditemukan' });
+        if (!title || !functionDesc || !importantNote || !videoUrl) {
+            return res.status(400).json({ error: 'Semua field utama wajib diisi' });
         }
 
-        const oldData = oldGuideResult.rows[0];
-        const oldVideoUrl = oldData.video_url;
-        let finalVideoUrl = videoUrl;
+        const client = await db.getClient();
+        try {
+            await client.query('BEGIN');
 
-        // 2. Jika TIDAK ada video baru yang di-upload, tapi TITLE berubah -> Rename & Pindahkan Folder Video
-        if (oldVideoUrl === videoUrl && title.trim() !== oldData.title.trim()) {
-            const oldRelativePath = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
-            const oldFilePath = path.join(__dirname, '../public', oldRelativePath);
-            const oldFolderPath = path.dirname(oldFilePath);
-            const fileName = path.basename(oldFilePath);
+            const oldGuideQuery = `
+                SELECT title, type, video_url AS "videoUrl" 
+                FROM content 
+                WHERE id = $1 
+                FOR UPDATE;
+            `;
+            const oldGuideResult = await client.query(oldGuideQuery, [guideId]);
+
+            if (oldGuideResult.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ error: 'Guide tidak ditemukan' });
+            }
+
+            const oldData = oldGuideResult.rows[0];
+            const oldVideoUrl = oldData.videoUrl;
 
             const safeTypeFolder = (oldData.type || 'default').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-            const newSafeTitleFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+            const targetTitleFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
 
-            const newFolderPath = path.join(__dirname, '../public/videos', safeTypeFolder, newSafeTitleFolder);
-            const newFilePath = path.join(newFolderPath, fileName);
+            const currentRelPath = videoUrl.startsWith('/') ? videoUrl.slice(1) : videoUrl;
+            const fileName = path.basename(currentRelPath);
 
-            if (fs.existsSync(oldFilePath)) {
-                if (!fs.existsSync(newFolderPath)) {
-                    fs.mkdirSync(newFolderPath, { recursive: true });
+            const finalVideoUrl = `/videos/${safeTypeFolder}/${targetTitleFolder}/${fileName}`;
+            const targetRelPath = finalVideoUrl.startsWith('/') ? finalVideoUrl.slice(1) : finalVideoUrl;
+
+            const targetFilePath = path.join(__dirname, '../public', targetRelPath);
+            const targetFolderPath = path.dirname(targetFilePath);
+
+            if (!fs.existsSync(targetFolderPath)) {
+                fs.mkdirSync(targetFolderPath, { recursive: true });
+            }
+
+            const currentFilePath = path.join(__dirname, '../public', currentRelPath);
+            let sourceFilePath = null;
+
+            if (fs.existsSync(currentFilePath)) {
+                sourceFilePath = currentFilePath;
+            } else if (oldVideoUrl) {
+                const oldRelPath = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
+                const oldFilePath = path.join(__dirname, '../public', oldRelPath);
+                if (fs.existsSync(oldFilePath)) {
+                    sourceFilePath = oldFilePath;
                 }
+            }
 
-                fs.renameSync(oldFilePath, newFilePath);
+            if (sourceFilePath && sourceFilePath !== targetFilePath) {
+                fs.renameSync(sourceFilePath, targetFilePath);
+                console.log(`[File Saved] Video berhasil dipindahkan ke: ${targetFilePath}`);
+            }
 
-                try {
-                    if (fs.existsSync(oldFolderPath)) {
-                        fs.rmSync(oldFolderPath, { recursive: true, force: true });
+            if (fs.existsSync(targetFilePath)) {
+                const foldersToClean = new Set();
+
+                if (oldVideoUrl) {
+                    const oldRel = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
+                    foldersToClean.add(path.dirname(path.join(__dirname, '../public', oldRel)));
+                }
+                foldersToClean.add(path.dirname(currentFilePath));
+
+                for (const oldFolder of foldersToClean) {
+                    if (oldFolder !== targetFolderPath && fs.existsSync(oldFolder)) {
+                        try {
+                            fs.rmSync(oldFolder, { recursive: true, force: true });
+                            console.log(`[Clean Success] Folder lama dibersihkan: ${oldFolder}`);
+                        } catch (e) {
+                            console.warn('Gagal menghapus folder lama:', e.message);
+                        }
                     }
-                } catch (e) {
-                    console.warn('Gagal membersihkan folder lama:', e.message);
                 }
-
-                finalVideoUrl = `/videos/${safeTypeFolder}/${newSafeTitleFolder}/${fileName}`;
+            } else {
+                console.warn(`[Warning] File video target tidak ditemukan di: ${targetFilePath}`);
             }
-        }
 
-        // 3. Update DB menggunakan finalVideoUrl
-        const updateContentQuery = `
-            UPDATE content 
-            SET 
-                title = $1, 
-                function_desc = $2, 
-                important_note = $3, 
-                video_url = $4
-            WHERE id = $5
-            RETURNING id;
-        `;
-        await client.query(updateContentQuery, [
-            title, 
-            functionDesc, 
-            importantNote, 
-            finalVideoUrl, 
-            id
-        ]);
+            const updateContentQuery = `
+                UPDATE content 
+                SET 
+                    title = $1, 
+                    function_desc = $2, 
+                    important_note = $3, 
+                    video_url = $4,
+                    updated_at = NOW()
+                WHERE id = $5
+                RETURNING id;
+            `;
+            await client.query(updateContentQuery, [
+                title, 
+                functionDesc, 
+                importantNote, 
+                finalVideoUrl, 
+                guideId
+            ]);
 
-        // 4. Update steps
-        await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [id]);
+            await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
 
-        if (Array.isArray(steps)) {
-            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
-            for (let i = 0; i < cleanSteps.length; i++) {
-                await client.query(
-                    `INSERT INTO guide_steps (guide_id, step_order, step_description)
-                     VALUES ($1, $2, $3);`,
-                    [id, i + 1, cleanSteps[i]]
-                );
+            if (Array.isArray(steps)) {
+                const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+                for (let i = 0; i < cleanSteps.length; i++) {
+                    await client.query(
+                        `INSERT INTO guide_steps (guide_id, step_order, step_description)
+                         VALUES ($1, $2, $3);`,
+                        [guideId, i + 1, cleanSteps[i]]
+                    );
+                }
             }
+
+            await client.query('COMMIT');
+
+            res.status(200).json({ 
+                message: 'Guide berhasil diperbarui',
+                id: guideId 
+            });
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
         }
-
-        await client.query('COMMIT');
-
-        // 5. Jika ADA video baru yang di-upload, hapus video & folder lama dari server
-        if (oldVideoUrl && oldVideoUrl !== videoUrl) {
-            const relativePath = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
-            const oldFilePath = path.join(__dirname, '../public', relativePath);
-            const oldFolderPath = path.dirname(oldFilePath);
-
-            try {
-                if (fs.existsSync(oldFilePath)) fs.unlinkSync(oldFilePath);
-                if (fs.existsSync(oldFolderPath)) fs.rmSync(oldFolderPath, { recursive: true, force: true });
-            } catch (err) {
-                console.warn(`Gagal membersihkan file video lama:`, err.message);
-            }
-        }
-
-        return res.status(200).json({ 
-            message: 'Guide berhasil diperbarui',
-            id 
-        });
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        next(error);
-    } finally {
-        client.release();
-    }
+    }).catch(next);
 });
 
 router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
@@ -491,7 +558,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-});
+}); 
 
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
@@ -573,21 +640,26 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 const safeTypeFolder = typeParam.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
                 const safeTitleFolder = titleParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
 
-                const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
+                // Kunci antrean berdasarkan jalur folder target
+                const queueKey = `folder_${safeTypeFolder}_${safeTitleFolder}`;
 
-                if (!fs.existsSync(targetDir)) {
-                    fs.mkdirSync(targetDir, { recursive: true });
-                }
+                enqueueTask(queueKey, async () => {
+                    const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
-                const timestamp = Date.now();
-                const safeFilename = `${timestamp}${extension}`;
-                const filepath = path.join(targetDir, safeFilename);
+                    if (!fs.existsSync(targetDir)) {
+                        fs.mkdirSync(targetDir, { recursive: true });
+                    }
 
-                fs.writeFileSync(filepath, videoBuffer);
+                    const timestamp = Date.now();
+                    const safeFilename = `${timestamp}${extension}`;
+                    const filepath = path.join(targetDir, safeFilename);
 
-                const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
+                    fs.writeFileSync(filepath, videoBuffer);
 
-                res.json({ videoPath: videoUrl });
+                    const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
+                    return res.json({ videoPath: videoUrl });
+                }).catch(next);
+
             } catch (error) {
                 next(error);
             }

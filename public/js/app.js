@@ -1,11 +1,10 @@
-let searchInput = document.querySelector('#main_search_bar');
-const searchButton = document.querySelector('#main_search_button');
-const typeContainer = document.querySelector('#contTypes');
-const cardContainer = document.querySelector('#contCard');
-const btn = document.querySelector('#fullscreenBtn');
+let searchInput = document.querySelector('#searchBar');
+const searchButton = document.querySelector('#searchBtn');
+const typeContainer = document.querySelector('#types');
+const fullscreenbtn = document.querySelector('#fullscreen');
 const bttnadd = document.querySelector('#bttnAdd a');
 
-let currentGuides = [];
+let types = [];
 
 function updateAddButtonUrl() {
   if (!bttnadd) return;
@@ -17,51 +16,6 @@ function updateAddButtonUrl() {
     bttnadd.href = `add-guide.html?type=${encodeURIComponent(currentType)}`;
   } else {
     bttnadd.href = 'add-guide.html';
-  }
-}
-
-function buildCard(cardData) {
-  if (!cardData || typeof cardData !== 'object') return;
-
-  const popCard = document.createElement('a');
-  popCard.classList.add('card_guide');
-  popCard.href = `guide.html?id=${cardData.id}`;
-  popCard.innerHTML = `
-      <div>
-          <h2>${cardData.title || ''}</h2>
-          <p>Deskripsi: ${cardData.functionDesc || '-'}</p>
-      </div>
-      <i class="fa-solid fa-chevron-right"></i>
-    `;
-  cardContainer.appendChild(popCard);
-}
-
-function renderCards(guides = []) {
-  if (!cardContainer) return;
-  cardContainer.innerHTML = "";
-
-  if (guides.length === 0) {
-    cardContainer.innerHTML = "<p>Tidak ada guide yang ditemukan.</p>";
-    return;
-  }
-
-  guides.forEach(item => buildCard(item));
-}
-
-async function loadGuides(type = null) {
-  try {
-    const endpoint = type ? `/api/guides/type/${encodeURIComponent(type)}` : '/api/guides';
-    
-    const response = await fetch(endpoint);
-    if (!response.ok) {
-      if (response.status === 404) return [];
-      throw new Error(`Gagal mengambil data (Status: ${response.status})`);
-    }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Gagal mengambil data: ', error);
-    return [];
   }
 }
 
@@ -197,7 +151,6 @@ function loadManageType() {
 async function buildBttnType() {
   if (!typeContainer) return;
 
-  const types = await getTypes();
   const urlParams = new URLSearchParams(window.location.search);
   const currentType = urlParams.get('type') || 'web';
 
@@ -206,7 +159,7 @@ async function buildBttnType() {
   types.forEach(type => {
     const typeName = typeof type === 'string' ? type : (type.name || type.type);
     const button = document.createElement('button');
-    button.classList.add('button_type');
+    button.classList.add('typeButton');
     
     if (currentType.toLowerCase() === typeName.toLowerCase()) {
       button.classList.add('active');
@@ -442,9 +395,8 @@ async function init() {
     window.history.replaceState({ path: newUrl }, '', newUrl);
   }
 
-  currentGuides = await loadGuides(selectedType);
+const types = await getTypes();
 
-  renderCards(currentGuides);
   buildBttnType();
   updateAddButtonUrl();
   loadManageType();
@@ -459,7 +411,6 @@ function performSearch() {
   if (searchQuery === "") {
     searchInput.placeholder = "Input tidak boleh kosong!";
     searchInput.classList.add('error-state');
-    renderCards(currentGuides);
 
     setTimeout(() => {
       searchInput.placeholder = originalPlaceholder;
@@ -468,7 +419,7 @@ function performSearch() {
     return;
   }
   
-  const searchMatched = currentGuides.filter(item => {
+  const searchMatched = t.filter(item => {
     return item && item.title && item.title.toLowerCase().includes(searchQuery);
   });
 
@@ -477,8 +428,6 @@ function performSearch() {
     searchInput.placeholder = "Not found";
     searchInput.classList.add('error-state');
     
-    renderCards(currentGuides);
-
     setTimeout(() => {
       searchInput.placeholder = originalPlaceholder;
       searchInput.classList.remove('error-state');
@@ -504,8 +453,8 @@ if (searchInput) {
   });
 }
 
-if (btn) {
-  btn.addEventListener('click', () => {
+if (fullscreenbtn) {
+  fullscreenbtn.addEventListener('click', () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
         console.error(`Error attempting to enable fullscreen: ${err.message}`);

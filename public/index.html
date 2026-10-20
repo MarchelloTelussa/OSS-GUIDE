@@ -5,123 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSS-Guide</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400..700;1,400..700&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
 <style>
     :root {
-        --black : rgb(0, 0, 0);
-        --white : rgb(255, 255, 255);
-        --lightgrey : rgb(200, 206, 214);
-        --grey : rgb(108, 117, 125);
-        --blue : rgb(0, 123, 255);
-        --bg : rgb(248, 249, 250);
+        --outline : rgb(200, 206, 214);
+        --text1 : rgb(71, 85, 105);
+        --text2 : rgb(108, 117, 125);
+        --main : rgb(5, 3, 102);
+        --second : rgb(3, 0, 151);
+        --second2 : rgb(250, 250, 250); 
     }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    nav { display: flex; flex-direction: row; justify-content: flex-end; align-items: center; width: 100%; min-height: 45px; border-bottom: 2px solid var(--lightgrey); background-color: var(--white); padding: 0px 13px; position: sticky; top: 0; z-index: 1000; }
-    nav .nav_profile { display: flex; flex-direction: row; justify-content: space-around; gap: 10px; }
-    nav .nav_profile li { list-style: none; }
-    nav .nav_profile li a i { text-decoration: none; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Arimo";}
     html, body { height: 100vh; margin: 0; overflow: hidden; }
-    main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-    .container_search { display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; gap: 1rem; background-color: var(--blue); flex-shrink: 0; }
-    .header_search { font-size: 2rem; color: var(--white); }
-    .input_search { display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; max-width: 600px; min-height: 48px; padding: 12px 24px; border-radius: 50px; background-color: white; box-sizing: border-box; }
-    .input_search input { flex: 1; border: none; outline: none; font-size: 1.2rem; background: transparent; width: 100%; }
-    .error-state::placeholder { color: red; }
-    .input_search button { width: auto; border: none; background-color: transparent; font-size: 1.5rem; }
-    .input_search button:hover { cursor: pointer; color: var(--blue); }
-    .container_guide { display: flex; flex-direction: column; margin: 20px 40px; font-size: 1rem; flex: 1; min-height: 0; border: 2px solid var(--black); }
-    .container_type { display: flex; flex-direction: row; align-items: center; justify-content: space-between; background-color: rgb(226, 179, 255, 1); padding: 0 1rem 0 0; flex-shrink: 0; }
-    .container_bttn { display: flex; flex-direction: row; overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
-    .container_bttn::-webkit-scrollbar { display: none; }
-    .button_type { padding: 0.4rem 1.5rem; background: none; border: none; font-size: 1rem; font-weight: bold; whitespace: nowrap; }
-    .button_type:hover { background-color: rgba(158, 0, 254, 0.6); cursor: pointer; }
-    .active { background-color: rgba(186, 75, 254, 0.6); border: 2px dotted black; }
-    .container_card { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: max-content; gap: 15px; width: 100%; flex: 1; overflow-y: auto; padding: 15px 8px 40px 8px; box-sizing: border-box; background-color: var(--bg); -webkit-overflow-scrolling: touch; }
-    .container_card::-webkit-scrollbar { width: 6px; }
-    .container_card::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-    .container_card::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
-    .container_card::-webkit-scrollbar-thumb:hover { background: #888; }
-    .card_guide { display: flex; justify-content: space-between; width: 100%; min-height: 80px; padding: 1rem; text-decoration: none; border-radius: 15px; color: var(--black); border: 2px solid var(--black); background-color: var(--white); box-sizing: border-box; transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
-    .card_guide h2 { margin: 0; font-size: 1.8rem; }
-    .card_guide p { margin: 5px 0 0 0; color: var(--grey); font-size: 1rem; }
-    .card_guide:hover { transform: translateY(-3px); box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.15); }
-    .button_group { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 1rem; }
-    .button_add a { color: black; }
-    .button_Manage button { background: none; border: none; cursor: pointer; }
-    .container_manage_type { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 9999; padding: 10px; }
-    .manage_type_box { display: flex; flex-direction: column; background: #ffffff; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); height: 90%; overflow: hidden; }
-    .delete { width: 35%; height: 30%; background-color: whitesmoke; }
-    .manage_type_header { display: flex; flex-direction: row; justify-content: space-between; align-items: center; font-weight: bold; }
-    .manage_type_header button { font-weight: bold; }
-    .manage_type_body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; width: 100%; }
-    .modal-close-btn { background: transparent; border: none; font-size: 20px; cursor: pointer; }
-    .modal-footer { display: flex; justify-content: flex-end; margin-top: 15px; }
-    .type-row { border-bottom: 1px solid #e5e7eb; background-color: snow; transition: background-color 0.2s ease; }
-    .type-row:hover { background-color: #f9fafb; }
-    .type-row td { padding: 12px 16px; vertical-align: middle; font-size: 16px; color: #374151; }
-    .col-no { width: 50px; text-align: center; font-weight: 600; color: #6b7280; }
-    .col-name { font-weight: 500; }
-    .col-action { width: 140px; text-align: right; white-space: nowrap; }
-    .btn-action { padding: 6px 12px; font-size: 12px; font-weight: 500; border-radius: 6px; border: none; cursor: pointer; transition: all 0.2s ease; margin-left: 4px; }
-    .btn-edit { background-color: #e0f2fe; color: #0369a1; }
-    .btn-edit:hover { background-color: #bae6fd; }
-    .btn-delete { background-color: #fee2e2; color: #b91c1c; }
-    .btn-delete:hover { background-color: #fecaca; }
-    .type-row-loading td, .type-row-empty td, .type-row-error td { text-align: center; padding: 24px 16px; color: #6b7280; font-style: italic; }
-    .type-row-error td { color: #dc2626; }
-    @media (max-width: 1024px) { .container_card { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 768px) { html, body { height: auto; overflow: auto; } main { height: auto; min-height: 100vh; overflow: visible; } .container_search { flex-direction: column; align-items: stretch; padding: 1rem; } .header_search { text-align: center; font-size: 1.5rem; } .input_search { max-width: 100%; min-height: 42px; padding: 8px 16px; } .input_search input { font-size: 1rem; } .container_guide { margin: 10px; border-width: 1px; } .container_type { flex-direction: row; align-items: center; padding: 0.5rem; gap: 0.5rem; } .container_bttn { width: 100%; padding-bottom: 5px; } .button_group { width: 40%; justify-content: flex-end; } .button_type { padding: 0.4rem 1rem; font-size: 0.9rem; } .manage_type_box { width: 95%; height: 95%; padding: 15px; } }
-    @media (max-width: 600px) { .container_card { grid-template-columns: 1fr; padding: 10px; } .card_guide h2 { font-size: 1.4rem; } .card_guide p { font-size: 0.9rem; } .col-action { width: auto; } .btn-action { padding: 4px 8px; font-size: 11px; } }
+    .fa, .fas, .far, .fab { border-radius: 0px !important; }
+    .navContainer {top: 0; display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; padding: 0 1rem; min-height: 2.75rem;background-color: var(--main);}
+    .appName {color: white; font-weight: bold; font-size: 1.2rem;}
+    .navAction {list-style-type: none; list-style: none; margin: 0; padding: 0; display: flex; gap: 0.8rem;}
+    .navAction a {text-decoration: none; color: white; font-size: 1.2rem; font-weight: 500;}
 
+    header {display: flex; flex-direction: row; align-items: flex-end; margin: 1.5rem 5rem 0; width: 100%; max-height: 5rem;}
+    .logoHeader { width: 3.5rem; height: 3.5rem; flex-shrink: 0; object-fit: contain;}
+    .pageName {color: var(--main); font-size: 4rem; margin: 0 0 -0.75rem 0.5rem; padding: 0;}
+    .searchContainer {display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; max-width: 40rem; height: 100%; max-height: 3rem; padding: 1rem 1rem; border-radius: 10px; border: 1px solid black; box-sizing: border-box; margin: 0 0 0 2.5rem}
+    .searchContainer input {flex: 1; border: none; outline: none; font-size: 1.2rem; background: transparent; width: 100%;}
+    .searchContainer button {width: auto; border: none; background-color: transparent; font-size: 2rem;}
+    .searchContainer button:hover {cursor: pointer; color: var(--blue);}
+
+    main {height: 100vh; overflow: hidden; margin: 0.25rem 5rem 0; border: 1px solid black;}
+    .content {display: flex; flex-direction: column; height: 100%;}
+    .typeContainer {display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 2rem 0 0; width: 100%; height: 100%; max-height: 2.5rem; min-height: 2.5rem; background-color: var(--main);}
+    .typeGroup {display:flex; flex-direction: row; width: 45%; height: 100%;}
+    .typeButton {display: flex; align-items: center; justify-content: center; width: 9rem; height: 100%;}
+    .typeButton.active {background-color: var(--second);}
+    .typeButton h1 {color: white; font-size: 1.5rem;}
+    .typeManageButton button {color: white; background: none; border: none; cursor: pointer; font-size: 1.25rem;}
+    
+    .identityContainer {display: flex; flex-direction: row; width: 100%; height: 100%; gap: 20px;}
+    .typeIdentity {width: 50%; background-color: var(--second2); padding: 1rem 2rem 0 2rem;}
+    .typeIdentity h1 {font-size: 2.5rem; margin: 0 0 1rem 0;}
+    .typeIdentity p {font-weight: bold; font-size: 1rem; text-align: justify;}
+    
+    .typeFlow {width: 25%; object-fit: contain; padding: 1rem 1rem 0 1rem; margin: 0 0 1rem 0; overflow: hidden; background-color: var(--second2); }
+    .typeFlow img {width: 100%; }
+    .typeFlow h1 {font-size: 2.5rem; margin: 0 0 1rem 0;}
+
+    .guideGroupContainer {width: 25%; padding: 1rem 1rem 0 1rem;  background-color: var(--second2);}
+    .guideGroupContainer h1 {font-size: 2.5rem; margin: 0 0 1rem 0;}
+
+    .guideGroup {display: flex; flex-direction: row; justify-content: space-between; align-items: center; max-width: 20rem; max-height: 4rem; width: 100%; height: 100%; border: 1px solid black; border-radius: 5px; padding: 0 0.5rem; cursor: pointer;}
+    .guideGroup h1 {margin: 0;}
+
+    .backdrop {position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); opacity: 0; visibility: hidden; transition: opacity 0.3s; z-index: 90; filter: blur(20px);}
+    .backdrop.active { opacity: 1; visibility: visible; }
 </style>
 </head>
 <body>
-    <nav>
-        <ul class="nav_profile">
+    <nav class="navContainer">
+        <div class="appName">
+            <h3>QUANTUM GUIDE</h3>
+        </div>
+        <ul class="navAction">
             <li>
                 <a href="index.html">
                     <i class="fa-regular fa-circle-question"></i>
                 </a>
             </li>
             <li>
-                <a href="#" id="navUser">
+                <a href="#" id="user">
                     <i class="fa-regular fa-circle-user"></i>
                 </a>
             </li>
             <li>
-                <a href="#" id="fullscreenBtn">
+                <a href="#" id="fullscreen">
                     <i class="fa-solid fa-maximize"></i>
                 </a>
             </li>
         </ul>
     </nav>
-    <main>
-        <div class="container_search">
-            <div class="header_search">
-                <h1> Dashboard </h1>
-            </div>
-            <div class="input_search">
-                <input id="main_search_bar" type="text">
-                <button id="main_search_button">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                </button>
-            </div>
+    <header>
+        <img class="logoHeader" src="./img/logo.png" alt="">
+        <h1 class="pageName">DASHBOARD</h1>
+        <div class="searchContainer">
+            <input id="searchBar" type="text">
+            <button id="searchBtn">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </button>
         </div>
-        <div class="container_guide">
-            <div class="container_type">
-                <div  id ="contTypes" class="container_bttn">
-
-                </div>
-                <div class="button_group">
-                    <div id="bttnAdd" class="button_add">
-                        <a href="add-guide.html" title="Add New Guide"> <i class="fa-solid fa-plus"></i> </a>
+    </header>
+    <main>
+        <div class="content">
+            <div class="typeContainer">
+                    <div id ="types" class="typeGroup">
+                        <div class="typeButton active">
+                            <h1>Type</h1>
+                        </div>
+                        <div class="typeButton">
+                            <h1>Type</h1>
+                        </div>
                     </div>
-                    <div id="bttnManage" class="button_Manage">
-                        <button title="Manage Types"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
-                    </div>
+                <div id="btnManage" class="typeManageButton">
+                    <button title="Manage Types"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
                 </div>
             </div>
-            <div id="contCard" class="container_card">
-
+            <div class="identityContainer">
+                <div class="typeIdentity">
+                    <span id="typeName" class="name">
+                        <h1>OSS WEB</h1>
+                    </span>
+                    <span id="typeDesc" class="description">
+                        <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cupiditate ratione error eveniet dolore. Voluptatibus, voluptas? Sed, quam repellendus! Assumenda odit quibusdam velit, quasi voluptatibus ad corrupti recusandae corporis officia mollitia!</p>
+                    </span>
+                </div>
+                <div class="typeFlow">
+                    <h1>
+                        Flow
+                    </h1>
+                    <img src="/img/flow.png" alt="">
+                </div>
+                <div id="guideGroup" class="guideGroupContainer">
+                    <h1>
+                        Guide
+                    </h1>
+                    <div class="guideGroup">
+                        <h1>Card Test</h1>
+                        <i class="fa-solid fa-angle-up fa-2xl"></i>
+                    </div>
+                </div>
             </div>
         </div>
     </main>

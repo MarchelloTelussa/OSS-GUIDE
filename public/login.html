@@ -4,30 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - OSS-Guide</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
     :root {
-        --white : rgb(255, 255, 255);
-        --lightgrey : rgb(200, 206, 214);
-        --grey : rgb(108, 117, 125);
-        --darkgrey : rgb(71, 85, 105);
-        --blue : rgb(0, 123, 255);
-        --bg : rgb(248, 249, 250);
+        --outline : rgb(200, 206, 214);
+        --text1 : rgb(71, 85, 105);
+        --text2 : rgb(108, 117, 125);
+        --main : rgb(5, 3, 102);
+        --second : rgb(3, 0, 151);
     }
     * {margin: 0; padding: 0; box-sizing: border-box;}
-    body {display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; font-family: Arial, sans-serif; background-color: var(--blue);}
+    body {display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;  font-family: "Arimo", sans-serif; background-color: var(--main);}
 
-    .container {width: 100%; max-width: 400px; background-color: var(--white); padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);}
-    .container h1 {color: var(--blue); text-align: center; margin-bottom: 5px;}
-    .container .subtitle {color: var(--grey); text-align: center; margin-bottom: 30px;}
+    .loginBox {width: 100%; max-width: 400px; background-color: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);}
+    .loginBox h1 {color: var(--main); text-align: center; margin-bottom: 5px;}
+    .loginBox .subtitle {color: var(--text2); text-align: center; margin-bottom: 30px;}
 
-    .form-group {margin-bottom: 20px; display: flex; flex-direction: column;}
+    .form-group {margin-bottom: 20px; display: flex; flex-direction: column; color: var(--text1);}
     .form-group label {font-weight: bold; margin-bottom: 8px; color: var(--darkgrey);}
-    .form-group input {padding: 10px; border: 1px solid var(--lightgrey); border-radius: 5px; font-size: 1rem; font-family: Arial, sans-serif;}
-    .form-group input:focus {outline: none; border-color: var(--blue); box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);}
+    .form-group input {padding: 10px; border: 1px solid var(--outline); border-radius: 5px; font-size: 1rem;}
+    .form-group input:focus {outline: none; border-color: var(--main); box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);}
 
-    .submit-btn {width: 100%; padding: 12px; border: none; border-radius: 5px; background-color: var(--blue); color: var(--white); font-size: 1rem; font-weight: bold; cursor: pointer;}
-    .submit-btn:hover {background-color: #0056b3;}
+    .submit-btn {width: 100%; padding: 12px; border: none; border-radius: 5px; background-color: var(--main); color: white; font-size: 1rem; font-weight: bold; cursor: pointer;}
+    .submit-btn:hover {background-color: var(--second);}
     .submit-btn:disabled {background-color: var(--grey); cursor: not-allowed;}
 
     .message {text-align: center; padding: 12px; border-radius: 5px; margin-bottom: 20px; display: none;}
@@ -37,7 +37,7 @@
 </head>
 
 <body>
-    <div class="container">
+    <div class="loginBox">
         <h1>OSS USER GUIDE</h1>
         <p class="subtitle">Login untuk melanjutkan</p>
         <div id="message" class="message"></div>

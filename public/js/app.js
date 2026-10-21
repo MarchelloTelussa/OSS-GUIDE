@@ -412,14 +412,24 @@ function renderManageTypeList() {
 
 async function handleCreateType() {
     const title = elements.newTypeTitleInput.value.trim();
+    
+    // 1. Validasi input tidak boleh kosong
     if (!title) {
         alert('Judul Type tidak boleh kosong!');
         return;
     }
 
-    const isDuplicate = state.types.some(t => t.title.trim().toLowerCase() === title.toLowerCase());
+    // Normalisasi input user (hapus spasi & ubah ke huruf kecil)
+    const normalizedInput = title.toLowerCase().replace(/\s+/g, '');
+
+    // 2. Cek apakah nama type sudah ada (abaikan spasi dan case)
+    const isDuplicate = state.types.some(type => {
+        const normalizedExisting = type.title.trim().toLowerCase().replace(/\s+/g, '');
+        return normalizedExisting === normalizedInput;
+    });
+
     if (isDuplicate) {
-        alert(`Peringatan: Type dengan nama "${title}" sudah ada!`);
+        alert(`Peringatan: Type dengan nama "${title}" sudah ada (atau mirip tanpa spasi). Silakan gunakan nama lain!`);
         return;
     }
 
@@ -427,10 +437,17 @@ async function handleCreateType() {
         const response = await fetch(`${API_BASE}/types`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description: "", imgUrl: "" })
+            body: JSON.stringify({
+                title: title,
+                description: "",
+                imgUrl: ""
+            })
         });
 
-        if (!response.ok) throw new Error('Gagal menambah Type');
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Gagal menambah Type');
+        }
 
         elements.newTypeTitleInput.value = '';
         await fetchAndRenderTypes();
@@ -438,13 +455,14 @@ async function handleCreateType() {
 
     } catch (error) {
         console.error('Error creating type:', error);
-        alert('Gagal membuat type.');
+        alert(error.message || 'Gagal membuat type.');
     }
 }
 
 function openEditTypeModal(type) {
     elements.editTypeId.value = type.id;
     elements.editTypeTitle.value = type.title;
+    elements.editTypeTitle.dataset.originalTitle = type.title; // Simpan judul asli untuk pengecekan lokal
     elements.editTypeDesc.value = type.description || '';
     
     currentExistingImgUrl = type.imgUrl || '';
@@ -468,6 +486,26 @@ async function handleUpdateType(e) {
     const description = elements.editTypeDesc.value.trim();
     const imageFile = elements.editTypeImageInput?.files ? elements.editTypeImageInput.files[0] : null;
 
+    if (!title) {
+        alert('Judul Type tidak boleh kosong!');
+        return;
+    }
+
+    // Normalisasi input baru (hapus spasi & ubah ke huruf kecil)
+    const normalizedInput = title.toLowerCase().replace(/\s+/g, '');
+
+    // Cek duplikasi dengan Type lain (abaikan spasi dan case)
+    const isDuplicate = state.types.some(type => {
+        if (type.id === parseInt(id, 10)) return false; // Abaikan Type yang sedang di-edit
+        const normalizedExisting = type.title.trim().toLowerCase().replace(/\s+/g, '');
+        return normalizedExisting === normalizedInput;
+    });
+
+    if (isDuplicate) {
+        alert(`Peringatan: Type dengan nama "${title}" sudah digunakan oleh Type lain (atau mirip tanpa spasi). Silakan gunakan nama lain!`);
+        return;
+    }
+
     let finalImgUrl = currentExistingImgUrl;
 
     try {
@@ -481,7 +519,10 @@ async function handleUpdateType(e) {
                 body: formData
             });
 
-            if (!uploadRes.ok) throw new Error('Gagal mengunggah gambar');
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json();
+                throw new Error(errData.error || 'Gagal mengunggah gambar');
+            }
 
             const uploadData = await uploadRes.json();
             finalImgUrl = uploadData.imgUrl;
@@ -493,7 +534,10 @@ async function handleUpdateType(e) {
             body: JSON.stringify({ title, description, imgUrl: finalImgUrl })
         });
 
-        if (!response.ok) throw new Error('Gagal memperbarui Type');
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Gagal memperbarui Type');
+        }
 
         closeAllModals();
         await fetchAndRenderTypes();
@@ -501,7 +545,7 @@ async function handleUpdateType(e) {
 
     } catch (error) {
         console.error('Error updating type:', error);
-        alert('Gagal mengupdate type.');
+        alert(error.message || 'Gagal mengupdate type.');
     }
 }
 

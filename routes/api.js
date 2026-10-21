@@ -130,11 +130,25 @@ router.get('/types/:id', async (req, res, next) => {
 });
 
 // POST create type (ITAdmin only)
+// POST create type
 router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const { title, description, imgUrl } = req.body;
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Title field is required' });
+        }
+
+        const trimmedTitle = title.trim();
+
+        const checkDuplicate = await db.query(
+            `SELECT id FROM type 
+            WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
+            ${id ? 'AND id != $2' : ''}`,
+            id ? [newTitle, id] : [trimmedTitle]
+        );
+
+        if (checkDuplicate.rows.length > 0) {
+            return res.status(400).json({ error: `Type dengan nama "${trimmedTitle}" sudah ada. Silakan gunakan nama lain.` });
         }
 
         const queryText = `
@@ -143,7 +157,7 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
             RETURNING id, title, description, image_url AS "imgUrl";
         `;
         const { rows } = await db.query(queryText, [
-            title.trim(), 
+            trimmedTitle, 
             description || '', 
             imgUrl || ''
         ]);
@@ -162,6 +176,19 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title field is required' });
+    }
+
+    const newTitle = title.trim();
+
+    const checkDuplicate = await db.query(
+        `SELECT id FROM type 
+        WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
+        ${id ? 'AND id != $2' : ''}`,
+        id ? [newTitle, id] : [trimmedTitle]
+    );
+
+    if (checkDuplicate.rows.length > 0) {
+        return res.status(400).json({ error: `Type dengan nama "${newTitle}" sudah digunakan oleh Type lain.` });
     }
 
     const client = await db.getClient();

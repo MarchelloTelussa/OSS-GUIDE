@@ -40,22 +40,17 @@ function looksLikeVideo(buf, ext) {
     return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS';
 }
 
-// -------------------------------------------------------------
-// 1. ROUTE SPESIFIK (Wajib Diletakkan Sebelum Parameter Dinamis)
-// -------------------------------------------------------------
+// =============================================================
+// 1. TYPE ROUTES (CRUD)
+// =============================================================
 
-router.get('/guides', async (req, res, next) => {
+// GET all types
+router.get('/types', async (req, res, next) => {
     try {
         const queryText = `
-        SELECT
-            c.id,
-            c.title,
-            c.function_desc AS "functionDesc",
-            c.viewcount AS "views"
-        FROM content c
-        LEFT JOIN guide_steps gs ON c.id = gs.guide_id
-        GROUP BY c.id
-        ORDER BY c.id ASC;
+            SELECT id, title, description, flow_url AS "flowUrl", created_at, updated_at
+            FROM type
+            ORDER BY id ASC;
         `;
         const { rows } = await db.query(queryText);
         res.json(rows);
@@ -64,223 +59,35 @@ router.get('/guides', async (req, res, next) => {
     }
 });
 
-router.get('/guides/types', async (req, res, next) => {
-    try {
-        const queryText = `
-        SELECT DISTINCT type
-        FROM content
-        WHERE type IS NOT NULL
-        ORDER BY type ASC;
-        `;
-        const { rows } = await db.query(queryText);
-        
-        const types = rows.map(row => row.type);
-        res.json(types);
-    } catch (error) {
-        next(error);
-    }
-});
-
-router.put('/guide/types/:type', requireAuth('ITAdmin'), async (req, res, next) => {
-    const { type } = req.params;
-    const { newType } = req.body;
-
-    if (!newType || !newType.trim()) {
-        return res.status(400).json({ error: 'newType tidak boleh kosong' });
-    }
-
-    const trimmedNewType = newType.trim();
-
-    // Tentukan nama folder safe untuk type lama dan baru
-    const safeOldType = type.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
-    const safeNewType = trimmedNewType.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-
-    const client = await db.getClient();
-
-    try {
-        await client.query('BEGIN');
-
-        // 1. Update kolom `type` pada tabel content
-        const updateTypeQuery = `
-            UPDATE content
-            SET type = $2
-            WHERE type = $1
-            RETURNING id, video_url;
-        `;
-
-        const { rows } = await client.query(updateTypeQuery, [type, trimmedNewType]);
-
-        if (rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Type tidak ditemukan' });
-        }
-
-        // 2. Update seluruh string `video_url` yang mengandung folder type lama menjadi type baru
-        const oldPathPrefix = `/videos/${safeOldType}/`;
-        const newPathPrefix = `/videos/${safeNewType}/`;
-
-        const updateVideoUrlQuery = `
-            UPDATE content
-            SET video_url = REPLACE(video_url, $1, $2)
-            WHERE type = $3 AND video_url LIKE $4;
-        `;
-
-        await client.query(updateVideoUrlQuery, [
-            oldPathPrefix,
-            newPathPrefix,
-            trimmedNewType,
-            `${oldPathPrefix}%`
-        ]);
-
-        await client.query('COMMIT');
-
-        // 3. Rename folder di filesystem dari public/videos/old_type ke public/videos/new_type
-        if (safeOldType !== safeNewType) {
-            const oldFolderPath = path.join(__dirname, '../public/videos', safeOldType);
-            const newFolderPath = path.join(__dirname, '../public/videos', safeNewType);
-
-            try {
-                if (fs.existsSync(oldFolderPath)) {
-                    const videosParentDir = path.dirname(newFolderPath);
-                    if (!fs.existsSync(videosParentDir)) {
-                        fs.mkdirSync(videosParentDir, { recursive: true });
-                    }
-
-                    fs.renameSync(oldFolderPath, newFolderPath);
-                    console.log(`Folder type berhasil di-rename dari '${safeOldType}' ke '${safeNewType}'`);
-                }
-            } catch (fsErr) {
-                console.warn(`Gagal mengubah nama folder filesystem:`, fsErr.message);
-            }
-        }
-
-        return res.status(200).json({
-            message: 'Berhasil mengubah type dan memperbarui path video serta folder',
-            oldType: type,
-            newType: trimmedNewType,
-            updatedCount: rows.length
-        });
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        next(error);
-    } finally {
-        client.release();
-    }
-});
-
-router.delete('/guides/types/:type', requireAuth('ITAdmin'), async (req, res, next) => {
-    const { type } = req.params;
-
-    // Gunakan db.getClient() sesuai export di db.js
-    const client = await db.getClient();
-
-    try {
-        await client.query('BEGIN');
-
-        const queryText = `
-            DELETE FROM content
-            WHERE type = $1
-            RETURNING id;
-        `;
-        
-        const { rows } = await client.query(queryText, [type]);
-
-        if (rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({
-                error: 'Tidak ada guide dengan type tersebut'
-            });
-        }
-
-        // Sanitasi nama type folder
-        const safeTypeFolder = type.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
-        const typeFolderPath = path.join(__dirname, '../public/videos', safeTypeFolder);
-
-        // Hapus folder type dan seluruh isi di dalamnya
-        try {
-            if (fs.existsSync(typeFolderPath)) {
-                fs.rmSync(typeFolderPath, { recursive: true, force: true });
-                console.log(`Folder type '${safeTypeFolder}' beserta seluruh isinya berhasil dihapus: ${typeFolderPath}`);
-            }
-        } catch (dirErr) {
-            console.warn(`Gagal menghapus folder type:`, dirErr.message);
-        }
-
-        await client.query('COMMIT');
-
-        return res.json({
-            message: 'Berhasil menghapus guide dan folder type',
-            deletedCount: rows.length,
-            deletedIds: rows.map(row => row.id)
-        });
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        next(error);
-    } finally {
-        client.release();
-    }
-});
-
-router.get('/guides/type/:type', async (req, res, next) => {
-    const { type } = req.params;
-    try {
-        const queryText = `
-        SELECT
-            c.id,
-            c.title,
-            c.important_note AS "importantNote",
-            c.function_desc AS "functionDesc",
-            c.video_url AS "videoUrl",
-            COALESCE (
-                json_agg(gs.step_description ORDER BY gs.step_order) FILTER (WHERE gs.step_description IS NOT NULL),
-                '[]'
-            ) AS steps,
-            c.type
-        FROM content c
-        LEFT JOIN guide_steps gs ON c.id = gs.guide_id
-        WHERE c.type = $1 AND TRIM(c.title) <> ''
-        GROUP BY c.id
-        ORDER BY c.id ASC;
-        `;
-        const { rows } = await db.query(queryText, [type]);
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Guide not found' });
-        }
-        res.json(rows);
-    } catch (error) {
-        next(error);
-    } 
-});
-
-// -------------------------------------------------------------
-// 2. ROUTE PARAMETER DINAMIS (:id)
-// -------------------------------------------------------------
-
-router.get('/guides/:id', async (req, res, next) => {
+// GET single type by ID (including nested groups)
+router.get('/types/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
         const queryText = `
-            SELECT
-                c.id,
-                c.title,
-                c.important_note AS "importantNote",
-                c.function_desc AS "functionDesc",
-                c.video_url AS "videoUrl",
+            SELECT 
+                t.id, 
+                t.title, 
+                t.description, 
+                t.flow_url AS "flowUrl",
                 COALESCE(
-                    json_agg(gs.step_description ORDER BY gs.step_order) FILTER (WHERE gs.step_description IS NOT NULL),
+                    json_agg(
+                        json_build_object(
+                            'id', g.id,
+                            'title', g.title,
+                            'description', g.description,
+                            'groupOrder', g.group_order
+                        ) ORDER BY g.group_order ASC
+                    ) FILTER (WHERE g.id IS NOT NULL),
                     '[]'
-                ) AS steps,
-                c.type
-            FROM content c
-            LEFT JOIN guide_steps gs ON c.id = gs.guide_id
-            WHERE c.id = $1
-            GROUP BY c.id;
+                ) AS groups
+            FROM type t
+            LEFT JOIN guide_groups g ON t.id = g.type_id
+            WHERE t.id = $1
+            GROUP BY t.id;
         `;
         const { rows } = await db.query(queryText, [id]);
         if (rows.length === 0) {
-            return res.status(404).json({ error: 'Guide not found' });
+            return res.status(404).json({ error: 'Type not found' });
         }
         res.json(rows[0]);
     } catch (error) {
@@ -288,86 +95,315 @@ router.get('/guides/:id', async (req, res, next) => {
     }
 });
 
-router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
-    const { id } = req.params;
-    const guideId = parseInt(id, 10);
-
-    if (isNaN(guideId)) {
-        return res.status(400).json({ error: 'ID tidak valid' });
-    }
-
-    enqueueTask(guideId, async () => {
-        const client = await db.getClient();
-
-        try {
-            await client.query('BEGIN');
-
-            const queryText = `
-                DELETE FROM content
-                WHERE id = $1
-                RETURNING id, video_url AS "videoUrl";
-            `;
-
-            const { rows } = await client.query(queryText, [guideId]);
-
-            if (rows.length === 0) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Guide tidak ditemukan' });
-            }
-
-            const videoUrl = rows[0].videoUrl;
-
-            if (videoUrl) {
-                let cleanPath = videoUrl.trim();
-                cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-                const relativePath = cleanPath.startsWith('public/') ? cleanPath.replace('public/', '') : cleanPath;
-
-                const absoluteFilePath = path.join(__dirname, '../public', relativePath);
-                const titleFolderPath = path.dirname(absoluteFilePath);
-
-                try {
-                    if (fs.existsSync(absoluteFilePath)) {
-                        fs.unlinkSync(absoluteFilePath);
-                    }
-
-                    // Hapus folder guide sampai bersih
-                    if (fs.existsSync(titleFolderPath)) {
-                        fs.rmSync(titleFolderPath, { recursive: true, force: true });
-                        console.log(`Folder guide berhasil dibersihkan: ${titleFolderPath}`);
-                    }
-
-                    // Hapus folder kategori jika sudah tidak ada isinya lagi
-                    const categoryFolderPath = path.dirname(titleFolderPath);
-                    if (fs.existsSync(categoryFolderPath) && fs.readdirSync(categoryFolderPath).length === 0) {
-                        fs.rmdirSync(categoryFolderPath);
-                        console.log(`Folder kategori kosong dihapus: ${categoryFolderPath}`);
-                    }
-                } catch (fileErr) {
-                    console.warn(`Gagal menghapus file/folder video:`, fileErr.message);
-                }
-            }
-
-            await client.query('COMMIT');
-
-            res.json({
-                message: 'Guide berhasil dihapus',
-                deletedId: rows[0].id
-            });
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
+// POST create type (ITAdmin only)
+router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
+    try {
+        const { title, description, flowUrl } = req.body;
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'Title field is required' });
         }
-    }).catch(next);
+
+        const queryText = `
+            INSERT INTO type (title, description, flow_url)
+            VALUES ($1, $2, $3)
+            RETURNING id, title, description, flow_url AS "flowUrl";
+        `;
+        const { rows } = await db.query(queryText, [
+            title.trim(), 
+            description || null, 
+            flowUrl || null
+        ]);
+
+        res.status(201).json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
 });
 
+// PUT update type (ITAdmin only)
+router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    const { title, description, flowUrl } = req.body;
+
+    if (!title || !title.trim()) {
+        return res.status(400).json({ error: 'Title field is required' });
+    }
+
+    try {
+        const queryText = `
+            UPDATE type
+            SET title = $1, description = $2, flow_url = $3
+            WHERE id = $4
+            RETURNING id, title, description, flow_url AS "flowUrl";
+        `;
+        const { rows } = await db.query(queryText, [
+            title.trim(), 
+            description || null, 
+            flowUrl || null, 
+            id
+        ]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Type not found' });
+        }
+
+        res.json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// DELETE type (ITAdmin only)
+router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        const queryText = `
+            DELETE FROM type
+            WHERE id = $1
+            RETURNING id;
+        `;
+        const { rows } = await db.query(queryText, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Type not found' });
+        }
+
+        res.json({ message: 'Type successfully deleted', deletedId: rows[0].id });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// =============================================================
+// 2. GUIDE GROUPS ROUTES (CRUD)
+// =============================================================
+
+// GET all guide groups (optional filter by ?typeId=)
+router.get('/groups', async (req, res, next) => {
+    const { typeId } = req.query;
+    try {
+        let queryText = `
+            SELECT id, type_id AS "typeId", title, description, group_order AS "groupOrder"
+            FROM guide_groups
+        `;
+        const params = [];
+
+        if (typeId) {
+            queryText += ` WHERE type_id = $1`;
+            params.push(typeId);
+        }
+
+        queryText += ` ORDER BY group_order ASC, id ASC;`;
+
+        const { rows } = await db.query(queryText, params);
+        res.json(rows);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GET single guide group by ID (with nested guides list)
+router.get('/groups/:id', async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        const queryText = `
+            SELECT 
+                gg.id,
+                gg.type_id AS "typeId",
+                gg.title,
+                gg.description,
+                gg.group_order AS "groupOrder",
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', g.id,
+                            'title', g.title,
+                            'functionDesc', g.function_desc,
+                            'viewcount', g.viewcount
+                        ) ORDER BY g.id ASC
+                    ) FILTER (WHERE g.id IS NOT NULL),
+                    '[]'
+                ) AS guides
+            FROM guide_groups gg
+            LEFT JOIN guide g ON gg.id = g.group_id
+            WHERE gg.id = $1
+            GROUP BY gg.id;
+        `;
+        const { rows } = await db.query(queryText, [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide Group not found' });
+        }
+        res.json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST create guide group (ITAdmin only)
+router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
+    try {
+        const { typeId, title, description, groupOrder } = req.body;
+
+        if (!typeId || !title || !title.trim()) {
+            return res.status(400).json({ error: 'typeId and title are required' });
+        }
+
+        const queryText = `
+            INSERT INTO guide_groups (type_id, title, description, group_order)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
+        `;
+        const { rows } = await db.query(queryText, [
+            typeId,
+            title.trim(),
+            description || null,
+            groupOrder || 0
+        ]);
+
+        res.status(201).json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// PUT update guide group (ITAdmin only)
+router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    const { typeId, title, description, groupOrder } = req.body;
+
+    if (!typeId || !title || !title.trim()) {
+        return res.status(400).json({ error: 'typeId and title are required' });
+    }
+
+    try {
+        const queryText = `
+            UPDATE guide_groups
+            SET type_id = $1, title = $2, description = $3, group_order = $4
+            WHERE id = $5
+            RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
+        `;
+        const { rows } = await db.query(queryText, [
+            typeId,
+            title.trim(),
+            description || null,
+            groupOrder || 0,
+            id
+        ]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide Group not found' });
+        }
+
+        res.json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// DELETE guide group (ITAdmin only)
+router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        const queryText = `
+            DELETE FROM guide_groups
+            WHERE id = $1
+            RETURNING id;
+        `;
+        const { rows } = await db.query(queryText, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide Group not found' });
+        }
+
+        res.json({ message: 'Guide Group successfully deleted', deletedId: rows[0].id });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// =============================================================
+// 3. GUIDE ROUTES (CRUD)
+// =============================================================
+
+// GET all guides (optional filter by ?groupId=)
+router.get('/guides', async (req, res, next) => {
+    const { groupId } = req.query;
+    try {
+        let queryText = `
+            SELECT 
+                g.id,
+                g.group_id AS "groupId",
+                g.title,
+                g.function_desc AS "functionDesc",
+                g.important_note AS "importantNote",
+                g.video_url AS "videoUrl",
+                g.video_description AS "videoDescription",
+                g.viewcount AS "views"
+            FROM guide g
+        `;
+        const params = [];
+
+        if (groupId) {
+            queryText += ` WHERE g.group_id = $1`;
+            params.push(groupId);
+        }
+
+        queryText += ` ORDER BY g.id ASC;`;
+
+        const { rows } = await db.query(queryText, params);
+        res.json(rows);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GET single guide by ID (with ordered steps)
+router.get('/guides/:id', async (req, res, next) => {
+    const { id } = req.params;
+    try {
+        const queryText = `
+            SELECT 
+                g.id,
+                g.group_id AS "groupId",
+                g.title,
+                g.function_desc AS "functionDesc",
+                g.important_note AS "importantNote",
+                g.video_url AS "videoUrl",
+                g.video_description AS "videoDescription",
+                g.viewcount AS "views",
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', gs.id,
+                            'stepOrder', gs.step_order,
+                            'stepDescription', gs.step_description
+                        ) ORDER BY gs.step_order ASC
+                    ) FILTER (WHERE gs.id IS NOT NULL),
+                    '[]'
+                ) AS steps
+            FROM guide g
+            LEFT JOIN guide_steps gs ON g.id = gs.guide_id
+            WHERE g.id = $1
+            GROUP BY g.id;
+        `;
+        const { rows } = await db.query(queryText, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide not found' });
+        }
+
+        res.json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST increment viewcount
 router.post('/guides/:id/view', async (req, res, next) => {
     const { id } = req.params;
     try {
         const result = await db.query(
-            'UPDATE content SET viewcount = viewcount + 1 WHERE id = $1 RETURNING viewcount',
+            'UPDATE guide SET viewcount = viewcount + 1 WHERE id = $1 RETURNING viewcount',
             [id]
         );
 
@@ -381,135 +417,173 @@ router.post('/guides/:id/view', async (req, res, next) => {
     }
 });
 
+// POST create guide (ITAdmin only)
+router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
+    const client = await db.getClient();
+    try {
+        const { groupId, title, functionDesc, importantNote, videoUrl, videoDescription, steps } = req.body;
+
+        if (!groupId || !title || !functionDesc) {
+            return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
+        }
+
+        await client.query('BEGIN');
+
+        const guideQuery = `
+            INSERT INTO guide (group_id, title, function_desc, important_note, video_url, video_description)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id;
+        `;
+        const guideResult = await client.query(guideQuery, [
+            groupId,
+            title.trim(),
+            functionDesc,
+            importantNote || null,
+            videoUrl || null,
+            videoDescription || null
+        ]);
+        const guideId = guideResult.rows[0].id;
+
+        if (Array.isArray(steps) && steps.length > 0) {
+            const stepsQuery = `
+                INSERT INTO guide_steps (guide_id, step_order, step_description)
+                VALUES ($1, $2, $3);
+            `;
+            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+
+            for (let i = 0; i < cleanSteps.length; i++) {
+                await client.query(stepsQuery, [guideId, i + 1, cleanSteps[i]]);
+            }
+        }
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            id: guideId,
+            message: 'Guide created successfully'
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        next(error);
+    } finally {
+        client.release();
+    }
+});
+
+// PUT update guide (ITAdmin only)
 router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
 
     if (isNaN(guideId)) {
-        return res.status(400).json({ error: 'ID tidak valid' });
+        return res.status(400).json({ error: 'Invalid ID' });
     }
 
-    enqueueTask(`guide_${guideId}`, async () => {
-        const { title, functionDesc, importantNote, videoUrl, steps } = req.body;
+    const client = await db.getClient();
+    try {
+        const { groupId, title, functionDesc, importantNote, videoUrl, videoDescription, steps } = req.body;
 
-        if (!title || !functionDesc || !importantNote || !videoUrl) {
-            return res.status(400).json({ error: 'Semua field utama wajib diisi' });
+        if (!groupId || !title || !functionDesc) {
+            return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
         }
 
+        await client.query('BEGIN');
+
+        const updateGuideQuery = `
+            UPDATE guide
+            SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5, video_description = $6
+            WHERE id = $7
+            RETURNING id;
+        `;
+        const { rows } = await client.query(updateGuideQuery, [
+            groupId,
+            title.trim(),
+            functionDesc,
+            importantNote || null,
+            videoUrl || null,
+            videoDescription || null,
+            guideId
+        ]);
+
+        if (rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Guide not found' });
+        }
+
+        // Replace steps
+        await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
+
+        if (Array.isArray(steps) && steps.length > 0) {
+            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+            for (let i = 0; i < cleanSteps.length; i++) {
+                await client.query(
+                    `INSERT INTO guide_steps (guide_id, step_order, step_description)
+                     VALUES ($1, $2, $3);`,
+                    [guideId, i + 1, cleanSteps[i]]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+
+        res.json({ message: 'Guide updated successfully', id: guideId });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        next(error);
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE guide (ITAdmin only)
+router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    const guideId = parseInt(id, 10);
+
+    if (isNaN(guideId)) {
+        return res.status(400).json({ error: 'Invalid ID' });
+    }
+
+    enqueueTask(guideId, async () => {
         const client = await db.getClient();
         try {
             await client.query('BEGIN');
 
-            const oldGuideQuery = `
-                SELECT title, type, video_url AS "videoUrl" 
-                FROM content 
-                WHERE id = $1 
-                FOR UPDATE;
+            const queryText = `
+                DELETE FROM guide
+                WHERE id = $1
+                RETURNING id, video_url AS "videoUrl";
             `;
-            const oldGuideResult = await client.query(oldGuideQuery, [guideId]);
+            const { rows } = await client.query(queryText, [guideId]);
 
-            if (oldGuideResult.rows.length === 0) {
+            if (rows.length === 0) {
                 await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Guide tidak ditemukan' });
+                return res.status(404).json({ error: 'Guide not found' });
             }
 
-            const oldData = oldGuideResult.rows[0];
-            const oldVideoUrl = oldData.videoUrl;
+            const videoUrl = rows[0].videoUrl;
 
-            const safeTypeFolder = (oldData.type || 'default').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-            const targetTitleFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+            // Optional video file removal if local file path is tracked
+            if (videoUrl) {
+                let cleanPath = videoUrl.trim();
+                cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+                const absoluteFilePath = path.join(__dirname, '../public', cleanPath);
 
-            const currentRelPath = videoUrl.startsWith('/') ? videoUrl.slice(1) : videoUrl;
-            const fileName = path.basename(currentRelPath);
-
-            const finalVideoUrl = `/videos/${safeTypeFolder}/${targetTitleFolder}/${fileName}`;
-            const targetRelPath = finalVideoUrl.startsWith('/') ? finalVideoUrl.slice(1) : finalVideoUrl;
-
-            const targetFilePath = path.join(__dirname, '../public', targetRelPath);
-            const targetFolderPath = path.dirname(targetFilePath);
-
-            if (!fs.existsSync(targetFolderPath)) {
-                fs.mkdirSync(targetFolderPath, { recursive: true });
-            }
-
-            const currentFilePath = path.join(__dirname, '../public', currentRelPath);
-            let sourceFilePath = null;
-
-            if (fs.existsSync(currentFilePath)) {
-                sourceFilePath = currentFilePath;
-            } else if (oldVideoUrl) {
-                const oldRelPath = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
-                const oldFilePath = path.join(__dirname, '../public', oldRelPath);
-                if (fs.existsSync(oldFilePath)) {
-                    sourceFilePath = oldFilePath;
-                }
-            }
-
-            if (sourceFilePath && sourceFilePath !== targetFilePath) {
-                fs.renameSync(sourceFilePath, targetFilePath);
-                console.log(`[File Saved] Video berhasil dipindahkan ke: ${targetFilePath}`);
-            }
-
-            if (fs.existsSync(targetFilePath)) {
-                const foldersToClean = new Set();
-
-                if (oldVideoUrl) {
-                    const oldRel = oldVideoUrl.startsWith('/') ? oldVideoUrl.slice(1) : oldVideoUrl;
-                    foldersToClean.add(path.dirname(path.join(__dirname, '../public', oldRel)));
-                }
-                foldersToClean.add(path.dirname(currentFilePath));
-
-                for (const oldFolder of foldersToClean) {
-                    if (oldFolder !== targetFolderPath && fs.existsSync(oldFolder)) {
-                        try {
-                            fs.rmSync(oldFolder, { recursive: true, force: true });
-                            console.log(`[Clean Success] Folder lama dibersihkan: ${oldFolder}`);
-                        } catch (e) {
-                            console.warn('Gagal menghapus folder lama:', e.message);
-                        }
+                try {
+                    if (fs.existsSync(absoluteFilePath)) {
+                        fs.unlinkSync(absoluteFilePath);
                     }
-                }
-            } else {
-                console.warn(`[Warning] File video target tidak ditemukan di: ${targetFilePath}`);
-            }
-
-            const updateContentQuery = `
-                UPDATE content 
-                SET 
-                    title = $1, 
-                    function_desc = $2, 
-                    important_note = $3, 
-                    video_url = $4,
-                    updated_at = NOW()
-                WHERE id = $5
-                RETURNING id;
-            `;
-            await client.query(updateContentQuery, [
-                title, 
-                functionDesc, 
-                importantNote, 
-                finalVideoUrl, 
-                guideId
-            ]);
-
-            await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
-
-            if (Array.isArray(steps)) {
-                const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
-                for (let i = 0; i < cleanSteps.length; i++) {
-                    await client.query(
-                        `INSERT INTO guide_steps (guide_id, step_order, step_description)
-                         VALUES ($1, $2, $3);`,
-                        [guideId, i + 1, cleanSteps[i]]
-                    );
+                } catch (fileErr) {
+                    console.warn(`Failed to delete associated video file:`, fileErr.message);
                 }
             }
 
             await client.query('COMMIT');
 
-            res.status(200).json({ 
-                message: 'Guide berhasil diperbarui',
-                id: guideId 
+            res.json({
+                message: 'Guide deleted successfully',
+                deletedId: rows[0].id
             });
 
         } catch (error) {
@@ -521,44 +595,9 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }).catch(next);
 });
 
-router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
-    try {
-        const { title, functionDesc, importantNote, videoUrl, steps, type } = req.body;
-
-        if (!title || !functionDesc || !importantNote || !videoUrl) {
-            return res.status(400).json({ error: 'Semua field wajib diisi' });
-        }
-
-        const guideQuery = `
-            INSERT INTO content (title, function_desc, important_note, video_url, viewcount, type)
-            VALUES ($1, $2, $3, $4, 0, $5)
-            RETURNING id
-        `;
-
-        const guideResult = await db.query(guideQuery, [title, functionDesc, importantNote, videoUrl, type]);
-        const guideId = guideResult.rows[0].id;
-
-        if (steps && Array.isArray(steps) && steps.length > 0) {
-            const stepsQuery = `
-                INSERT INTO guide_steps (guide_id, step_order, step_description)
-                VALUES ($1, $2, $3)
-            `;
-
-            for (let i = 0; i < steps.length; i++) {
-                if (steps[i].trim()) {
-                    await db.query(stepsQuery, [guideId, i + 1, steps[i].trim()]);
-                }
-            }
-        }
-
-        res.status(201).json({
-            id: guideId,
-            message: 'Guide created successfully'
-        });
-    } catch (error) {
-        next(error);
-    }
-}); 
+// =============================================================
+// 4. FILE UPLOAD ROUTE (ITAdmin only)
+// =============================================================
 
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
@@ -572,7 +611,7 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 if (!tooLarge) {
                     tooLarge = true;
                     chunks.length = 0;
-                    res.status(413).json({ error: 'Ukuran video maksimal 500 MB' });
+                    res.status(413).json({ error: 'Maximum video upload limit is 500 MB' });
                 }
                 return;
             }
@@ -600,15 +639,9 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 let videoBuffer = null;
                 let videoFilename = '';
-                let typeParam = 'default';
                 let titleParam = 'untitled';
 
                 for (const part of parts) {
-                    if (part.includes('name="type"')) {
-                        const contentStart = part.indexOf('\r\n\r\n') + 4;
-                        const contentEnd = part.lastIndexOf('\r\n');
-                        typeParam = part.substring(contentStart, contentEnd).trim() || 'default';
-                    }
                     if (part.includes('name="title"')) {
                         const contentStart = part.indexOf('\r\n\r\n') + 4;
                         const contentEnd = part.lastIndexOf('\r\n');
@@ -633,32 +666,25 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 const extension = path.extname(videoFilename).toLowerCase();
                 if (!ALLOWED_VIDEO_EXTENSIONS.includes(extension) || !looksLikeVideo(videoBuffer, extension)) {
                     return res.status(400).json({
-                        error: `File harus berupa video (${ALLOWED_VIDEO_EXTENSIONS.join(', ')})`
+                        error: `File must be a supported video format (${ALLOWED_VIDEO_EXTENSIONS.join(', ')})`
                     });
                 }
 
-                const safeTypeFolder = typeParam.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
                 const safeTitleFolder = titleParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+                const targetDir = path.join(__dirname, '../public/videos', safeTitleFolder);
 
-                // Kunci antrean berdasarkan jalur folder target
-                const queueKey = `folder_${safeTypeFolder}_${safeTitleFolder}`;
+                if (!fs.existsSync(targetDir)) {
+                    fs.mkdirSync(targetDir, { recursive: true });
+                }
 
-                enqueueTask(queueKey, async () => {
-                    const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
+                const timestamp = Date.now();
+                const safeFilename = `${timestamp}${extension}`;
+                const filepath = path.join(targetDir, safeFilename);
 
-                    if (!fs.existsSync(targetDir)) {
-                        fs.mkdirSync(targetDir, { recursive: true });
-                    }
+                fs.writeFileSync(filepath, videoBuffer);
 
-                    const timestamp = Date.now();
-                    const safeFilename = `${timestamp}${extension}`;
-                    const filepath = path.join(targetDir, safeFilename);
-
-                    fs.writeFileSync(filepath, videoBuffer);
-
-                    const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
-                    return res.json({ videoPath: videoUrl });
-                }).catch(next);
+                const videoUrl = `/videos/${safeTitleFolder}/${safeFilename}`;
+                return res.json({ videoPath: videoUrl });
 
             } catch (error) {
                 next(error);

@@ -1,477 +1,259 @@
-let searchInput = document.querySelector('#searchBar');
-const searchButton = document.querySelector('#searchBtn');
-const typeContainer = document.querySelector('#types');
-const fullscreenbtn = document.querySelector('#fullscreen');
-const bttnadd = document.querySelector('#bttnAdd a');
+// State Management
+const state = {
+    types: [],
+    selectedTypeId: null,
+    groups: [],
+    searchQuery: ''
+};
 
-let types = [];
+// API Base URL
+const API_BASE = '/api';
 
-function updateAddButtonUrl() {
-  if (!bttnadd) return;
+// DOM Elements
+const elements = {
+    typesContainer: document.getElementById('types'),
+    typeName: document.getElementById('typeName'),
+    typeDesc: document.getElementById('typeDesc'),
+    typeFlowContainer: document.querySelector('.typeFlow'),
+    guideGroupContainer: document.getElementById('guideGroup'),
+    searchBar: document.getElementById('searchBar'),
+    searchBtn: document.getElementById('searchBtn'),
+    fullscreenBtn: document.getElementById('fullscreen')
+};
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const currentType = urlParams.get('type');
-
-  if (currentType) {
-    bttnadd.href = `add-guide.html?type=${encodeURIComponent(currentType)}`;
-  } else {
-    bttnadd.href = 'add-guide.html';
-  }
+/**
+ * Initialize Dashboard
+ */
+async function init() {
+    setupEventListeners();
+    await fetchAndRenderTypes();
 }
 
-async function getTypes() {
-  try {
-    const response = await fetch('/api/guides/types');
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+/**
+ * Global Event Listeners Setup
+ */
+function setupEventListeners() {
+    // Search Button Click
+    if (elements.searchBtn) {
+        elements.searchBtn.addEventListener('click', handleSearch);
     }
-    const types = await response.json(); 
-    return types;
-  } catch (error) {
-    console.error('Gagal mengambil types: ', error);
-    return [];
-  }
+
+    // Search Input 'Enter' Key
+    if (elements.searchBar) {
+        elements.searchBar.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSearch();
+        });
+    }
+
+    // Fullscreen Toggle
+    if (elements.fullscreenBtn) {
+        elements.fullscreenBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleFullscreen();
+        });
+    }
 }
 
-function loadManageType() {
-  const triggerBtn = document.getElementById('bttnManage');
-  if (!triggerBtn) return;
-
-  triggerBtn.addEventListener('click', showModal);
-
-  function showModal() {
-    if (document.getElementById('contMngType')) return;
-
-    const overlay = document.createElement("div");
-    overlay.id = 'contMngType';
-    overlay.className = 'container_manage_type';
-
-    overlay.innerHTML = `
-      <div class="manage_type_box">
-        <div class="manage_type_header">
-          <h3>Kelola Tipe Guide</h3>
-          <button id="modal-close-icon" class="modal-close-btn">&times;</button>
-        </div>
-
-        <div class="add-type-wrapper" style="padding: 12px 16px; display: flex; gap: 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-          <input type="text" id="inputAddType" placeholder="Masukkan nama tipe baru..." style="flex: 1; padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 4px;" />
-          <button id="btnAddNewType" style="padding: 6px 16px; background: #16a34a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">+ Tambah</button>
-        </div>
-
-        <div class="manage_type_body">
-          <table class="type-table" style="width: 100%;">
-            <thead>
-              <tr>
-                <th style="width: 50px; text-align: center;">No</th>
-                <th>Nama Tipe</th>
-                <th style="text-align: right; width: 140px;">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="mngTypeBody">
-              <!-- Baris data di-render oleh loadTypeRow() -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    const closeIcon = document.getElementById('modal-close-icon');
-    if (closeIcon) closeIcon.addEventListener('click', hideModal);
-
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) hideModal();
-    });
-
-    function hideModal() {
-      overlay.remove();
-    }
-
-    document.getElementById('btnAddNewType').onclick = async () => {
-      const inputElem = document.getElementById('inputAddType');
-      const newType = inputElem.value.trim().toLowerCase();
-
-      if (!newType) {
-        alert('Nama tipe baru tidak boleh kosong!');
-        return;
-      }
-
-      const allRows = document.querySelectorAll('.type-row');
-      let isDuplicate = false;
-
-      allRows.forEach(row => {
-        const existingType = row.dataset.type;
-        if (existingType && existingType.toLowerCase() === newType.toLowerCase()) {
-          isDuplicate = true;
+/**
+ * Fetch All Types & Render Navigation Tabs
+ */
+async function fetchAndRenderTypes() {
+    try {
+        const response = await fetch(`${API_BASE}/types`);
+        if (!response.ok) throw new Error('Failed to load types');
+        
+        state.types = await response.json();
+        
+        if (state.types.length === 0) {
+            elements.typesContainer.innerHTML = '<div class="typeButton"><h1>No Types</h1></div>';
+            return;
         }
-      });
 
-      if (isDuplicate) {
-        alert(`Tipe "${newType}" sudah ada! Silakan gunakan nama lain.`);
-        inputElem.focus();
-        return;
-      }
+        renderTypeTabs();
+        
+        // Select first type by default
+        selectType(state.types[0].id);
+    } catch (error) {
+        console.error('Error fetching types:', error);
+        elements.typesContainer.innerHTML = '<div class="typeButton"><h1>Error Loading</h1></div>';
+    }
+}
 
-      try {
-        const payload = {
-          title: ' ',
-          functionDesc: ' ',
-          importantNote: ' ',
-          videoUrl: ' ',
-          type: newType,
-          steps: [' ']
-        };
+function renderTypeTabs() {
+    elements.typesContainer.innerHTML = '';
 
-        const response = await fetch('/api/guides', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+    state.types.forEach((type) => {
+        const typeTab = document.createElement('div');
+        
+        // Tambahkan class 'active' jika ID type cocok dengan state.selectedTypeId
+        const isActive = type.id === state.selectedTypeId;
+        typeTab.className = `typeButton ${isActive ? 'active' : ''}`;
+        
+        typeTab.innerHTML = `<h1>${escapeHTML(type.title)}</h1>`;
+
+        // Event listener untuk memindahkan state active saat diklik
+        typeTab.addEventListener('click', () => {
+            if (state.selectedTypeId !== type.id) {
+                selectType(type.id);
+            }
         });
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Gagal menambahkan tipe baru');
-
-        alert(`Berhasil menambahkan tipe baru "${newType}"!`);
-        inputElem.value = '';
-        
-        loadTypeRow();
-        buildBttnType();
-
-      } catch (error) {
-        console.error('Error adding new type:', error);
-        alert(error.message);
-      }
-    };
-
-    loadTypeRow();
-  }
-}
-
-async function buildBttnType() {
-  if (!typeContainer) return;
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const currentType = urlParams.get('type') || 'web';
-
-  typeContainer.innerHTML = '';
-
-  types.forEach(type => {
-    const typeName = typeof type === 'string' ? type : (type.name || type.type);
-    const button = document.createElement('button');
-    button.classList.add('typeButton');
-    
-    if (currentType.toLowerCase() === typeName.toLowerCase()) {
-      button.classList.add('active');
-    }
-
-    button.textContent = typeName.toUpperCase();
-    
-    button.onclick = () => {
-      window.location.href = `/index.html?type=${encodeURIComponent(typeName)}`;
-    };
-    
-    typeContainer.appendChild(button);
-  });
-}
-
-async function loadTypeRow() {
-  const container = document.getElementById('mngTypeBody');
-  if (!container) return;
-
-  container.innerHTML = `
-    <tr class="type-row-loading">
-      <td colspan="3" style="text-align:center;">Memuat data...</td>
-    </tr>
-  `;
-
-  try {
-    const types = await getTypes();
-    if (!types || types.length === 0) {
-      container.innerHTML = `
-        <tr class="type-row-empty">
-          <td colspan="3" style="text-align:center;">Belum ada data tipe.</td>
-        </tr>
-      `;
-      return;
-    }
-
-    container.innerHTML = types.map((type, index) => {
-      const typeName = typeof type === 'string' ? type : (type.name || type.type);
-      return `
-        <tr class="type-row" id="row-type-${index}" data-index="${index}" data-type="${typeName}">
-          <td class="col-no" style="text-align:center;">${index + 1}</td>
-          <td class="col-name" id="col-name-${index}">${typeName}</td>
-          <td class="col-action" id="col-action-${index}" style="text-align:right;">
-            <button class="btn-action btn-edit" data-action="edit">Edit</button>
-            <button class="btn-action btn-delete" data-action="delete">Hapus</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    // PASANG EVENT LISTENER MENGGUNAKAN DELEGATION (Aman dari Masalah Scope)
-    container.onclick = async (e) => {
-      const button = e.target.closest('button');
-      if (!button) return;
-
-      const action = button.dataset.action;
-      const row = button.closest('.type-row');
-      if (!row) return;
-
-      const index = row.dataset.index;
-      const currentType = row.dataset.type;
-
-      if (action === 'edit') {
-        handleInlineEdit(index, currentType);
-      } else if (action === 'delete') {
-        handleDeleteType(currentType);
-      } else if (action === 'save') {
-        handleInlineSave(index, currentType);
-      } else if (action === 'cancel') {
-        handleInlineCancel(index, currentType);
-      }
-    };
-
-  } catch (error) {
-    console.error('Gagal memuat tipe:', error);
-    container.innerHTML = `
-      <tr class="type-row-error">
-        <td colspan="3" style="text-align:center; color:red;">Gagal mengambil data. Silakan coba lagi.</td>
-      </tr>
-    `;
-  }
-}
-
-// FUNGSI-FUNGSI AKSI (Bisa ditaruh di mana saja, tidak akan undefined)
-
-function handleInlineEdit(index, currentType) {
-  const nameCell = document.getElementById(`col-name-${index}`);
-  const actionCell = document.getElementById(`col-action-${index}`);
-  if (!nameCell || !actionCell) return;
-
-  nameCell.innerHTML = `
-    <input type="text" id="input-edit-${index}" value="${currentType}" style="width: 100%; padding: 4px 8px; box-sizing: border-box;" />
-  `;
-
-  actionCell.innerHTML = `
-    <button class="btn-action btn-save" data-action="save" style="background:#2563eb; color:#fff;">Simpan</button>
-    <button class="btn-action btn-cancel" data-action="cancel">Batal</button>
-  `;
-
-  const inputElem = document.getElementById(`input-edit-${index}`);
-  if (inputElem) inputElem.focus();
-}
-
-async function handleInlineSave(index, currentType) {
-  const inputElem = document.getElementById(`input-edit-${index}`);
-  if (!inputElem) return;
-
-  const newType = inputElem.value.trim().toLowerCase();
-
-  if (!newType) {
-    alert('Nama tipe tidak boleh kosong!');
-    return;
-  }
-
-  // Jika nama tidak berubah, batalkan saja
-  if (newType.toLowerCase() === currentType.toLowerCase()) {
-    handleInlineCancel(index, currentType);
-    return;
-  }
-
-  // Cek duplikasi lowercase dengan baris lain
-  const allRows = document.querySelectorAll('.type-row');
-  let isDuplicate = false;
-
-  allRows.forEach(r => {
-    if (r.id !== `row-type-${index}`) {
-      const otherTypeName = r.dataset.type;
-      if (otherTypeName && otherTypeName.toLowerCase() === newType.toLowerCase()) {
-        isDuplicate = true;
-      }
-    }
-  });
-
-  if (isDuplicate) {
-    alert(`Tipe "${newType}" sudah ada! Silakan gunakan nama lain.`);
-    inputElem.focus();
-    return;
-  }
-
-  // Kirim perubahan ke API
-  try {
-    const response = await fetch(`api/guide/types/${encodeURIComponent(currentType)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newType })
+        elements.typesContainer.appendChild(typeTab);
     });
-
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Gagal mengubah tipe');
-
-    alert('Berhasil mengubah tipe!');
-    loadTypeRow();
-    buildBttnType();
-  } catch (err) {
-    alert(err.message);
-  }
 }
 
-function handleInlineCancel(index, originalType) {
-  const nameCell = document.getElementById(`col-name-${index}`);
-  const actionCell = document.getElementById(`col-action-${index}`);
+/**
+ * Handle Type Tab Selection
+* @param {number|string} typeId 
+ */
+async function selectType(typeId) {
+    state.selectedTypeId = typeId;
 
-  if (nameCell) nameCell.textContent = originalType;
-  if (actionCell) {
-    actionCell.innerHTML = `
-      <button class="btn-action btn-edit" data-action="edit">Edit</button>
-      <button class="btn-action btn-delete" data-action="delete">Hapus</button>
-    `;
-  }
-}
+    // Render ulang tab agar class active berpindah ke tombol yang baru diklik
+    renderTypeTabs();
 
-function handleDeleteType(typeToDelete) {
-  if (document.getElementById('modal-delete-type')) return;
-
-  const overlay = document.createElement('div');
-  overlay.id = 'modal-delete-type';
-  overlay.className = 'container_manage_type sub-modal';
-
-  overlay.innerHTML = `
-    <div class="manage_type_box delete">
-      <div class="manage_type_header">
-        <h3>Konfirmasi Hapus</h3>
-        <button class="modal-close-btn" id="close-del-btn">&times;</button>
-      </div>
-      <div class="manage_type_body">
-        <p>Apakah Anda yakin ingin menghapus semua guide dengan tipe <strong>"${typeToDelete}"</strong>?</p>
-      </div>
-      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
-        <button id="cancel-del-btn" style="padding:6px 12px;">Batal</button>
-        <button id="confirm-del-btn" style="padding:6px 12px; background:#dc2626; color:#fff; border:none; border-radius:4px;">Hapus</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  const closeSubModal = () => overlay.remove();
-  document.getElementById('close-del-btn').onclick = closeSubModal;
-  document.getElementById('cancel-del-btn').onclick = closeSubModal;
-
-  document.getElementById('confirm-del-btn').onclick = async () => {
     try {
-      const response = await fetch(`/api/guides/types/${encodeURIComponent(typeToDelete)}`, {
-        method: 'DELETE'
-      });
+        const response = await fetch(`${API_BASE}/types/${typeId}`);
+        if (!response.ok) throw new Error('Failed to load type details');
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const textError = await response.text();
-        throw new Error(`Server tidak mengembalikan JSON. Status: ${response.status}`);
-      }
+        const typeData = await response.json();
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Gagal menghapus tipe');
+        // Update UI
+        renderTypeIdentity(typeData);
+        renderTypeFlow(typeData.flowUrl);
+        await fetchAndRenderGuideGroups(typeId);
 
-      alert(`Berhasil menghapus ${result.deletedCount} guide!`);
-      closeSubModal();
-      loadTypeRow();
-      buildBttnType();
-    } catch (err) {
-      alert(err.message);
+    } catch (error) {
+        console.error('Error selecting type:', error);
     }
-  };
 }
 
-async function init() {
-  const urlParams = new URLSearchParams(window.location.search);
-  let selectedType = urlParams.get('type');
-
-  if (!selectedType) {
-    selectedType = 'web';
-    const newUrl = `${window.location.pathname}?type=${selectedType}`;
-    window.history.replaceState({ path: newUrl }, '', newUrl);
-  }
-
-const types = await getTypes();
-
-  buildBttnType();
-  updateAddButtonUrl();
-  loadManageType();
+/**
+ * Render Type Title and Description
+ */
+function renderTypeIdentity(typeData) {
+    elements.typeName.innerHTML = `<h1>${escapeHTML(typeData.title)}</h1>`;
+    elements.typeDesc.innerHTML = `<p>${escapeHTML(typeData.description || 'No description available for this type.')}</p>`;
 }
 
-document.addEventListener('DOMContentLoaded', init);
-
-function performSearch() {
-  const searchQuery = searchInput.value.toLowerCase().trim();
-  const originalPlaceholder = "masukkan nama guide yang anda butuhkan";
-
-  if (searchQuery === "") {
-    searchInput.placeholder = "Input tidak boleh kosong!";
-    searchInput.classList.add('error-state');
-
-    setTimeout(() => {
-      searchInput.placeholder = originalPlaceholder;
-      searchInput.classList.remove('error-state');
-    }, 2500);
-    return;
-  }
-  
-  const searchMatched = t.filter(item => {
-    return item && item.title && item.title.toLowerCase().includes(searchQuery);
-  });
-
-  if (searchMatched.length === 0) {
-    searchInput.value = "";
-    searchInput.placeholder = "Not found";
-    searchInput.classList.add('error-state');
-    
-    setTimeout(() => {
-      searchInput.placeholder = originalPlaceholder;
-      searchInput.classList.remove('error-state');
-    }, 2500);
-  } else {
-    renderCards(searchMatched);
-  }
-}
-
-if (searchButton) {
-  searchButton.addEventListener('click', function(e) {
-    e.preventDefault();
-    performSearch();
-  });
-}
-
-if (searchInput) {
-  searchInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      performSearch();
-    }
-  });
-}
-
-if (fullscreenbtn) {
-  fullscreenbtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
+/**
+ * Render Flow Diagram Image
+ */
+function renderTypeFlow(flowUrl) {
+    if (flowUrl) {
+        elements.typeFlowContainer.innerHTML = `
+            <h1>Flow</h1>
+            <img src="${escapeHTML(flowUrl)}" alt="Flow Diagram" onerror="this.onerror=null; this.src='./img/flow.png';">
+        `;
     } else {
-      document.exitFullscreen();
+        elements.typeFlowContainer.innerHTML = `
+            <h1>Flow</h1>
+            <p style="padding-top:1rem;">No flow diagram available.</p>
+        `;
     }
-  });
 }
 
-setInterval(async () => {
+/**
+ * Fetch and Render Guide Groups for a Type
+ */
+async function fetchAndRenderGuideGroups(typeId) {
     try {
-        const res = await db.query('DELETE FROM sessions WHERE expires_at < NOW()');
-        if (res.rowCount > 0) {
-            console.log(`[CLEANUP] Berhasil membersihkan ${res.rowCount} sesi kadaluwarsa.`);
-        }
-    } catch (err) {
-        console.error('[CLEANUP ERROR]', err);
+        const response = await fetch(`${API_BASE}/groups?typeId=${typeId}`);
+        if (!response.ok) throw new Error('Failed to load guide groups');
+
+        state.groups = await response.json();
+        renderGuideGroups(state.groups);
+    } catch (error) {
+        console.error('Error fetching guide groups:', error);
+        elements.guideGroupContainer.innerHTML = '<h1>Guide</h1><p>Error loading guide groups.</p>';
     }
-}, 30 * 60 * 1000);
+}
+
+/**
+ * Render Guide Groups Cards
+ */
+function renderGuideGroups(groups) {
+    elements.guideGroupContainer.innerHTML = '<h1>Guide</h1>';
+
+    if (groups.length === 0) {
+        elements.guideGroupContainer.innerHTML += '<p style="margin-top:1rem;">No guides available in this group.</p>';
+        return;
+    }
+
+    groups.forEach((group) => {
+        const groupCard = document.createElement('div');
+        groupCard.className = 'guideGroup';
+        groupCard.style.marginBottom = '0.5rem';
+        groupCard.innerHTML = `
+            <h1>${escapeHTML(group.title)}</h1>
+            <i class="fa-solid fa-angle-right fa-xl"></i>
+        `;
+
+        // Handle Guide Group Click (Navigate or Open Guides Modal/List)
+        groupCard.addEventListener('click', () => handleGuideGroupClick(group));
+
+        elements.guideGroupContainer.appendChild(groupCard);
+    });
+}
+
+/**
+ * Handle Search Filter
+ */
+function handleSearch() {
+    const query = elements.searchBar.value.trim().toLowerCase();
+    state.searchQuery = query;
+
+    if (!query) {
+        renderGuideGroups(state.groups);
+        return;
+    }
+
+    const filteredGroups = state.groups.filter(group => 
+        group.title.toLowerCase().includes(query) || 
+        (group.description && group.description.toLowerCase().includes(query))
+    );
+
+    renderGuideGroups(filteredGroups);
+}
+
+/**
+ * Action when clicking a Guide Group Card
+ */
+function handleGuideGroupClick(group) {
+    // Redirects to guide list/view page or triggers modal preview
+    window.location.href = `guide.html?groupId=${group.id}`;
+}
+
+/**
+ * Toggle Window Fullscreen Mode
+ */
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+}
+
+/**
+ * Helper: Escape HTML string to prevent XSS
+ */
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, 
+        tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag] || tag)
+    );
+}
+
+// Run Initialization on DOM Ready
+document.addEventListener('DOMContentLoaded', init);

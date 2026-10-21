@@ -5,6 +5,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -48,7 +51,7 @@ function looksLikeVideo(buf, ext) {
 router.get('/types', async (req, res, next) => {
     try {
         const queryText = `
-            SELECT id, title, description, flow_url AS "flowUrl", created_at, updated_at
+            SELECT id, title, description, image_url AS "imgUrl", created_at, updated_at
             FROM type
             ORDER BY id ASC;
         `;
@@ -68,7 +71,7 @@ router.get('/types/:id', async (req, res, next) => {
                 t.id, 
                 t.title, 
                 t.description, 
-                t.flow_url AS "flowUrl",
+                t.image_url AS "imgUrl",
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -98,20 +101,20 @@ router.get('/types/:id', async (req, res, next) => {
 // POST create type (ITAdmin only)
 router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
-        const { title, description, flowUrl } = req.body;
+        const { title, description, imgUrl } = req.body;
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Title field is required' });
         }
 
         const queryText = `
-            INSERT INTO type (title, description, flow_url)
+            INSERT INTO type (title, description, image_url)
             VALUES ($1, $2, $3)
-            RETURNING id, title, description, flow_url AS "flowUrl";
+            RETURNING id, title, description, image_url AS "imgUrl";
         `;
         const { rows } = await db.query(queryText, [
             title.trim(), 
             description || null, 
-            flowUrl || null
+            imgUrl || null
         ]);
 
         res.status(201).json(rows[0]);
@@ -123,7 +126,7 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
 // PUT update type (ITAdmin only)
 router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
-    const { title, description, flowUrl } = req.body;
+    const { title, description, imgUrl } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title field is required' });
@@ -132,14 +135,14 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const queryText = `
             UPDATE type
-            SET title = $1, description = $2, flow_url = $3
+            SET title = $1, description = $2, image_url = $3
             WHERE id = $4
-            RETURNING id, title, description, flow_url AS "flowUrl";
+            RETURNING id, title, description, image_url AS "imgUrl";
         `;
         const { rows } = await db.query(queryText, [
             title.trim(), 
             description || null, 
-            flowUrl || null, 
+            imgUrl || null, 
             id
         ]);
 
@@ -685,6 +688,104 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 const videoUrl = `/videos/${safeTitleFolder}/${safeFilename}`;
                 return res.json({ videoPath: videoUrl });
+
+            } catch (error) {
+                next(error);
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
+    try {
+        const chunks = [];
+        let received = 0;
+        let tooLarge = false;
+
+        req.on('data', (chunk) => {
+            received += chunk.length;
+            if (received > MAX_IMAGE_SIZE) {
+                if (!tooLarge) {
+                    tooLarge = true;
+                    chunks.length = 0;
+                    res.status(413).json({ error: 'Ukuran gambar maksimal 10 MB' });
+                }
+                return;
+            }
+            chunks.push(chunk);
+        });
+
+        req.on('end', () => {
+            if (tooLarge) return;
+            try {
+                const buffer = Buffer.concat(chunks);
+                const contentType = req.headers['content-type'] || '';
+
+                if (!contentType.includes('multipart/form-data')) {
+                    return res.status(400).json({ error: 'Invalid content type' });
+                }
+
+                const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+                if (!boundaryMatch) {
+                    return res.status(400).json({ error: 'Invalid boundary' });
+                }
+
+                const boundary = boundaryMatch[1];
+                const data = buffer.toString('binary');
+                const parts = data.split(`--${boundary}`);
+
+                let imageBuffer = null;
+                let imageFilename = '';
+                let typeNameParam = 'default';
+
+                for (const part of parts) {
+                    if (part.includes('name="typeName"')) {
+                        const contentStart = part.indexOf('\r\n\r\n') + 4;
+                        const contentEnd = part.lastIndexOf('\r\n');
+                        typeNameParam = part.substring(contentStart, contentEnd).trim() || 'default';
+                    }
+                    if (part.includes('filename=')) {
+                        const filenameMatch = part.match(/filename="([^"]+)"/);
+                        if (filenameMatch) {
+                            imageFilename = filenameMatch[1];
+                            const contentStart = part.indexOf('\r\n\r\n') + 4;
+                            const contentEnd = part.lastIndexOf('\r\n');
+                            const content = part.substring(contentStart, contentEnd);
+                            imageBuffer = Buffer.from(content, 'binary');
+                        }
+                    }
+                }
+
+                if (!imageBuffer || !imageFilename) {
+                    return res.status(400).json({ error: 'File gambar tidak ditemukan' });
+                }
+
+                const extension = path.extname(imageFilename).toLowerCase();
+                if (!ALLOWED_IMAGE_EXTENSIONS.includes(extension)) {
+                    return res.status(400).json({
+                        error: `Format gambar harus berupa (${ALLOWED_IMAGE_EXTENSIONS.join(', ')})`
+                    });
+                }
+
+                // Sanitasi nama folder tipe
+                const safeTypeFolder = typeNameParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+                const targetDir = path.join(__dirname, '../public/img', safeTypeFolder);
+
+                if (!fs.existsSync(targetDir)) {
+                    fs.mkdirSync(targetDir, { recursive: true });
+                }
+
+                const timestamp = Date.now();
+                const safeFilename = `img_${timestamp}${extension}`;
+                const filepath = path.join(targetDir, safeFilename);
+
+                fs.writeFileSync(filepath, imageBuffer);
+
+                // Path relatif yang akan disimpan ke kolom img_url di DB
+                const imageRelPath = `/img/${safeTypeFolder}/${safeFilename}`;
+                return res.json({ imgUrl: imageRelPath });
 
             } catch (error) {
                 next(error);

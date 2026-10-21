@@ -43,15 +43,17 @@
     .typeManageButton button {color: white; background: none; border: none; cursor: pointer; font-size: 1.25rem;}
     
     .identityContainer {display: flex; flex-direction: row; width: 100%; height: 100%; gap: 20px;}
-    .typeIdentity {width: 50%; background-color: var(--second2); padding: 1rem 2rem 0 2rem;}
-    .typeIdentity h1 {font-size: 2.5rem; margin: 0 0 1rem 0; text-transform: uppercase;}
-    .typeIdentity p {font-weight: bold; font-size: 1rem; text-align: justify;}
-    
-    .typeFlow {width: 25%; object-fit: contain; padding: 1rem 1rem 0 1rem; margin: 0 0 1rem 0; overflow: hidden; background-color: var(--second2); }
-    .typeFlow img {width: 100%; }
-    .typeFlow h1 {font-size: 2.5rem; margin: 0 0 1rem 0;}
+    .typeIdentity { display: flex; flex-direction: column; width: 55%; height: 100%; max-height: 100%; margin: 0 0 1rem 0; padding: 1rem 2rem; background-color: var(--second2); box-sizing: border-box; overflow: hidden; }
 
-    .guideGroupContainer {width: 25%; padding: 1rem 1rem 0 1rem;  background-color: var(--second2);}
+    .typeDescription { width: 100%; flex-shrink: 0; margin-bottom: 1rem; }
+    .typeDescription h1 { font-size: 2.5rem; margin: 0 0 0.5rem 0; text-transform: uppercase; }
+    .typeDescription p { font-weight: bold; font-size: 1rem; text-align: justify; }
+
+    .typeImage { display: flex; flex-direction: column; width: 80%; flex: 1; min-height: 0; overflow: hidden; }
+    .typeImage h1 { font-size: 2.5rem; margin: 0 0 0.5rem 0; flex-shrink: 0; }
+    .typeImage img { width: 100%; height: 100%; object-fit: contain; object-position: top left; }
+
+    .guideGroupContainer {width: 45%; padding: 1rem 1rem 0 1rem;  background-color: var(--second2);}
     .guideGroupContainer h1 {font-size: 2.5rem; margin: 0 0 1rem 0;}
 
     .guideGroup { display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; min-height: 3rem; border: 1px solid var(--outline); border-radius: 6px; padding: 0.5rem 1rem; cursor: pointer; background-color: white; transition: transform 0.15s ease, box-shadow 0.15s ease; }
@@ -61,6 +63,34 @@
 
     .backdrop {position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); opacity: 0; visibility: hidden; transition: opacity 0.3s; z-index: 90; filter: blur(20px);}
     .backdrop.active { opacity: 1; visibility: visible; }
+
+    .typeModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); width: 90%; max-width: 650px; background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); z-index: 100; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+    .typeModal.active { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+    
+    .typeModalHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .typeModalHeader h2 { color: var(--main); font-size: 2rem; width: 100%; text-align: center; }
+    .typeModalHeader .closeModalBtn { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: black; position: absolute; top: 1rem; right: 1.5rem; }
+    
+    .addTypeForm { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background-color: var(--main); padding: 0.4rem; border-radius: 6px; }
+    .addTypeForm input { flex: 1; padding: 0.6rem 1rem; font-size: 1.1rem; border: none; outline: none; border-radius: 4px; }
+    .addTypeForm button { background: transparent; color: white; border: none; font-size: 1.5rem; padding: 0 1rem; cursor: pointer; }
+    
+    .typeListManage { display: flex; flex-direction: column; gap: 0.6rem; max-height: 320px; overflow-y: auto; padding-right: 0.3rem; }
+    .manageTypeItem { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+    .manageTypeTitle { flex: 1; background-color: var(--main); color: white; padding: 0.75rem 1rem; font-weight: bold; text-align: center; font-size: 1.1rem; border-radius: 4px; text-transform: uppercase; }
+    .manageTypeActions { display: flex; gap: 0.25rem; } .manageTypeActions button { background-color: var(--main); color: white; border: none; padding: 0.75rem 0.9rem; font-size: 1.1rem; cursor: pointer; border-radius: 4px; transition: background-color 0.2s; }
+    .manageTypeActions button:hover { background-color: var(--second); } .editTypeForm { display: flex; flex-direction: column; gap: 1rem; }
+    
+    .editTypeForm label { font-weight: bold; color: var(--main); margin-bottom: 0.2rem; display: block; }
+    .editTypeForm input[type="text"], .editTypeForm textarea { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--outline); border-radius: 6px; font-size: 1rem; outline: none; }
+    .editTypeForm button.btnSave { background-color: var(--main); color: white; border: none; padding: 0.8rem; font-size: 1.1rem; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 0.5rem; }
+    .editTypeForm button.btnSave:hover { background-color: var(--second); }
+
+    .guideHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .guideHeader h1 { font-size: 2.5rem; margin: 0; }
+    
+    .btnManageGroup { background: none; border: none; color: var(--main); cursor: pointer; font-size: 1.2rem; transition: color 0.2s; }
+    .btnManageGroup:hover { color: var(--second); }
 </style>
 </head>
 <body>
@@ -107,18 +137,17 @@
             </div>
             <div class="identityContainer">
                 <div class="typeIdentity">
-                    <span id="typeName" class="name">
-                        <h1>OSS WEB</h1>
-                    </span>
-                    <span id="typeDesc" class="description">
-                        <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cupiditate ratione error eveniet dolore. Voluptatibus, voluptas? Sed, quam repellendus! Assumenda odit quibusdam velit, quasi voluptatibus ad corrupti recusandae corporis officia mollitia!</p>
-                    </span>
-                </div>
-                <div class="typeFlow">
-                    <h1>
-                        Flow
-                    </h1>
-                    <img src="/img/flow.png" alt="">
+                    <div class="typeDescription">
+                        <span id="typeName" class="name">
+                            <h1>OSS WEB</h1>
+                        </span>
+                        <span id="typeDesc" class="description">
+                            <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cupiditate ratione error eveniet dolore. Voluptatibus, voluptas? Sed, quam repellendus! Assumenda odit quibusdam velit, quasi voluptatibus ad corrupti recusandae corporis officia mollitia!</p>
+                        </span>
+                    </div>
+                    <div class="typeImage">
+                        <img src="/img/screenshot.png" alt="">
+                    </div>
                 </div>
                 <div id="guideGroup" class="guideGroupContainer">
                     <h1>
@@ -132,9 +161,89 @@
             </div>
         </div>
     </main>
-    <footer>
+    <!-- Backdrop/Overlay Hitam -->
+<div id="backdrop" class="backdrop"></div>
 
-    </footer>
+<!-- Modal Manage Type -->
+<div id="manageTypeModal" class="typeModal">
+    <div class="typeModalHeader">
+        <h2>Manage Type Guide</h2>
+        <button id="closeManageModal" class="closeModalBtn">&times;</button>
+    </div>
+    <div class="addTypeForm">
+        <input type="text" id="newTypeTitleInput" placeholder="Masukkan judul type baru...">
+        <button id="btnSubmitAddType" title="Tambah Type"><i class="fa-solid fa-plus"></i></button>
+    </div>
+    
+    <!-- ELEMEN PENTING YANG MENYEBABKAN ERROR JIKA HILANG -->
+    <div id="typeListManage" class="typeListManage">
+        <!-- Item type akan di-render di sini oleh app.js -->
+    </div>
+</div>
+
+<!-- Modal Edit Type Detail -->
+<div id="editTypeModal" class="typeModal">
+    <div class="typeModalHeader">
+        <h2>Edit Type Detail</h2>
+        <button id="closeEditModal" class="closeModalBtn">&times;</button>
+    </div>
+    <form id="editTypeForm" class="editTypeForm">
+        <input type="hidden" id="editTypeId">
+        <div>
+            <label>Title</label>
+            <input type="text" id="editTypeTitle" required>
+        </div>
+        <div>
+            <label>Description</label>
+            <textarea id="editTypeDesc" rows="3" placeholder="Masukkan deskripsi..."></textarea>
+        </div>
+        <div>
+            <label>Upload Gambar / Screenshot Flow</label>
+            <input type="file" id="editTypeImageInput" accept="image/*">
+            <small id="currentImgUrlPath" style="display:block; margin-top: 4px; color: var(--text2);"></small>
+        </div>
+        <button type="submit" class="btnSave">Simpan Perubahan</button>
+    </form>
+</div>
+<!-- Modal Manage Guide Groups -->
+<div id="manageGroupModal" class="typeModal">
+    <div class="typeModalHeader">
+        <h2>Manage Guide Group</h2>
+        <button id="closeManageGroupModal" class="closeModalBtn">&times;</button>
+    </div>
+    <div class="addTypeForm">
+        <input type="text" id="newGroupTitleInput" placeholder="Masukkan judul group baru...">
+        <button id="btnSubmitAddGroup" title="Tambah Group"><i class="fa-solid fa-plus"></i></button>
+    </div>
+    <div id="groupListManage" class="typeListManage">
+        <!-- List Item Guide Group akan di-render di sini -->
+    </div>
+</div>
+
+<!-- Modal Edit Guide Group Detail -->
+<div id="editGroupModal" class="typeModal">
+    <div class="typeModalHeader">
+        <h2>Edit Guide Group</h2>
+        <button id="closeEditGroupModal" class="closeModalBtn">&times;</button>
+    </div>
+    <form id="editGroupForm" class="editTypeForm">
+        <input type="hidden" id="editGroupId">
+        <div>
+            <label>Title</label>
+            <input type="text" id="editGroupTitle" required>
+        </div>
+        <div>
+            <label>Description</label>
+            <textarea id="editGroupDesc" rows="3" placeholder="Masukkan deskripsi group..."></textarea>
+        </div>
+        <div>
+            <label>Order Position</label>
+            <input type="number" id="editGroupOrder" value="0">
+        </div>
+        <button type="submit" class="btnSave">Simpan Perubahan</button>
+    </form>
+</div>
+
     <script type="module" src="./js/app.js"></script>
     <script type="module" src="./js/nav-auth.js"></script>
 </body>

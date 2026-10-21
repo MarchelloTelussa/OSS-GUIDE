@@ -17,6 +17,8 @@
             --main2: rgb(7, 5, 113);
             --second: rgb(3, 0, 151);
             --second2: rgb(250, 250, 250); 
+            --danger: rgb(220, 53, 69);
+            --cancel: rgb(108, 117, 125);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Arimo";}
         html, body { height: 100vh; margin: 0; overflow: hidden; }
@@ -38,7 +40,7 @@
         .searchContainer button { width: auto; border: none; background-color: transparent; font-size: 2rem; }
         .searchContainer button:hover { cursor: pointer; color: var(--second); }
 
-        /* Dashboard Main (Guide List Mode) */
+        /* Dashboard Main */
         .dashboardMain { height: calc(100vh - 9.5rem); overflow: hidden; margin: 0.25rem 5rem 0; border: 1px solid black; }
         .content { display: flex; flex-direction: column; height: 100%; }
         .typeContainer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 2rem 0 0; width: 100%; height: 2.5rem; background-color: var(--main); }
@@ -56,14 +58,14 @@
         .guideCard p { margin: 5px 0 0 0; color: var(--text2); font-size: 0.95rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
         .guideCard:hover { transform: translateY(-3px); box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.1); }
 
-        /* Detail Mode Styles (Video View Mode) */
+        /* Detail Mode Styles */
         .detailHeader { display: flex; flex-direction: row; justify-content: space-between; align-items: center; height: 3.5rem; padding: 0 2rem; width: 100%; background-color: var(--main2); }
         .detailHeader h1 { color: white; font-size: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .detailMain { width: 100vw; height: calc(100vh - 6.25rem); position: relative; background-color: black; }
         .detailMain video { width: 100%; height: 100%; object-fit: contain; }
 
-        /* Overlay Drawer (Sidebar Detail dari Kanan) */
+        /* Overlay Drawer (Kanan) */
         .backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); opacity: 0; visibility: hidden; transition: opacity 0.3s ease; z-index: 90; }
         .backdrop.active { opacity: 1; visibility: visible; }
 
@@ -75,6 +77,26 @@
         .detailOverlay .noteBox { background-color: rgba(255, 255, 255, 0.1); padding: 1rem; border-left: 4px solid var(--outline); border-radius: 4px; }
         .detailOverlay ol { padding-left: 1.2rem; }
         .detailOverlay li { margin-bottom: 0.5rem; line-height: 1.4; }
+
+        /* Modal Overlay Add/Edit Guide Modal */
+        .guideModal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95); width: 90%; max-width: 900px; background: white; border-radius: 8px; padding: 2.5rem 2rem 2rem 2rem; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); z-index: 100; opacity: 0; visibility: hidden; transition: all 0.3s ease; max-height: 90vh; overflow-y: auto; }
+        .guideModal.active { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+        .guideModal h2 { text-align: center; color: var(--main); font-size: 2.2rem; margin-bottom: 1.5rem; font-weight: bold; }
+        .guideFormGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .guideFormLeft, .guideFormRight { display: flex; flex-direction: column; gap: 1.2rem; }
+        .formGroup { display: flex; flex-direction: column; gap: 0.4rem; }
+        .formGroup label { font-weight: bold; color: var(--text1); font-size: 0.95rem; }
+        .formGroup input[type="text"], .formGroup textarea, .formGroup input[type="file"] { width: 100%; padding: 0.75rem; border: 1px solid var(--outline); border-radius: 4px; font-size: 1rem; outline: none; }
+        .formGroup textarea { resize: vertical; min-height: 110px; }
+        .stepsContainer { display: flex; flex-direction: column; gap: 0.6rem; max-height: 320px; overflow-y: auto; background-color: #f5f5f5; padding: 1rem; border-radius: 4px; min-height: 280px; }
+        .stepItem { display: flex; gap: 0.5rem; align-items: center; }
+        .stepItem input { flex: 1; padding: 0.6rem; border: 1px solid var(--outline); border-radius: 4px; font-size: 1rem; }
+        .stepItem .btnRemoveStep { background-color: var(--danger); color: white; border: none; padding: 0.6rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 1.1rem; }
+        .btnAddStep { background-color: var(--main); color: white; border: none; padding: 0.75rem; border-radius: 4px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; margin-top: 0.5rem; }
+        .modalActions { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; }
+        .modalActions button { padding: 0.75rem 2rem; font-size: 1.1rem; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; }
+        .modalActions .btnSubmitGuide { background-color: var(--main); color: white; }
+        .modalActions .btnCancelGuide { background-color: var(--cancel); color: white; }
     </style>
 </head>
 
@@ -93,12 +115,15 @@
     <!-- Container Utama untuk Mode List / Mode Video Detail -->
     <div id="viewContainer"></div>
 
-    <!-- Overlay Drawer Sidebar (Muncul dari kanan) -->
+    <!-- Overlay Drawer Sidebar (Kanan) -->
     <div id="backdrop" class="backdrop"></div>
     <aside id="detailOverlay" class="detailOverlay">
         <button id="closeOverlay" class="closeBtn">&times;</button>
         <div id="overlayContent"></div>
     </aside>
+
+    <!-- Tempat Penampungan Modal Form Add/Edit Guide (Hanya Di-inject untuk ITAdmin) -->
+    <div id="adminGuideModalHolder"></div>
 
     <script type="module" src="./js/guide.js"></script>
     <script type="module" src="./js/nav-auth.js"></script>

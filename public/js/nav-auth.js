@@ -1,5 +1,5 @@
 // Mengisi navbar sesuai user yang login: nama, tombol logout, dan menu Add Guide (khusus ITAdmin)
-const userLink = document.querySelector('#navUser');
+const userLink = document.getElementById('user');
 const addGuideLink = document.querySelector('a[href="add-guide.html"]');
 const manageTypeButton = document.querySelector('#bttnManage');
 

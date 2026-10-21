@@ -3,7 +3,9 @@ const state = {
     groupId: null,
     guides: [],
     currentGuide: null,
-    searchQuery: ''
+    searchQuery: '',
+    existingVideoUrl: '',
+    currentUser: null
 };
 
 const API_BASE = '/api';
@@ -16,13 +18,18 @@ const closeOverlayBtn = document.getElementById('closeOverlay');
 const overlayContent = document.getElementById('overlayContent');
 const fullscreenBtn = document.getElementById('fullscreen');
 
+// Dynamic Admin Elements References
+let guideModal, guideModalTitle, guideForm, guideIdInput, guideTitleInput, 
+    guideDescInput, guideNoteInput, guideVideoInput, currentVideoPath, 
+    stepsContainer, btnAddStep, btnCancelGuide;
+
 /**
  * Inisialisasi Halaman
  */
 async function init() {
+    await checkUserAuth();
     setupGlobalEvents();
 
-    // Ambil groupId dari parameter URL
     const urlParams = new URLSearchParams(window.location.search);
     state.groupId = urlParams.get('groupId');
 
@@ -32,30 +39,108 @@ async function init() {
         await fetchAllGuides();
     }
 
-    // Default: Tampilkan Mode List
     renderListView();
+}
+
+/**
+ * Verifikasi User & Inject Modal Admin untuk ITAdmin
+ */
+async function checkUserAuth() {
+    try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+            state.currentUser = await response.json();
+        }
+    } catch (err) {
+        console.warn('Auth check failed:', err);
+    }
+
+    if (state.currentUser && state.currentUser.role === 'ITAdmin') {
+        injectGuideAdminModal();
+    }
+}
+
+/**
+ * Injeksi DOM Modal Add/Edit Guide (Hanya untuk ITAdmin)
+ */
+function injectGuideAdminModal() {
+    const holder = document.getElementById('adminGuideModalHolder');
+    if (!holder) return;
+
+    holder.innerHTML = `
+        <div id="guideModal" class="guideModal">
+            <h2 id="guideModalTitle">Add Guide</h2>
+            <form id="guideForm">
+                <input type="hidden" id="guideId">
+                <div class="guideFormGrid">
+                    <div class="guideFormLeft">
+                        <div class="formGroup">
+                            <label for="guideTitleInput">Judul Guide *</label>
+                            <input type="text" id="guideTitleInput" required placeholder="Masukkan judul guide...">
+                        </div>
+                        <div class="formGroup">
+                            <label for="guideDescInput">Deskripsi Fungsi *</label>
+                            <textarea id="guideDescInput" required placeholder="Masukkan deskripsi fungsi..."></textarea>
+                        </div>
+                        <div class="formGroup">
+                            <label for="guideNoteInput">Catatan Penting *</label>
+                            <textarea id="guideNoteInput" placeholder="Masukkan catatan penting..."></textarea>
+                        </div>
+                        <div class="formGroup">
+                            <label for="guideVideoInput">Video *</label>
+                            <input type="file" id="guideVideoInput" accept="video/*">
+                            <small id="currentVideoPath" style="display:block; color: var(--text2); margin-top: 4px;"></small>
+                        </div>
+                    </div>
+                    <div class="guideFormRight">
+                        <div class="formGroup">
+                            <label>Steps</label>
+                            <div id="stepsContainer" class="stepsContainer"></div>
+                        </div>
+                        <button type="button" id="btnAddStep" class="btnAddStep">+ Tambah Step</button>
+                    </div>
+                </div>
+                <div class="modalActions">
+                    <button type="submit" id="btnSubmitGuide" class="btnSubmitGuide">Save Guide</button>
+                    <button type="button" id="btnCancelGuide" class="btnCancelGuide">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    // Cache referensi elemen yang baru di-inject
+    guideModal = document.getElementById('guideModal');
+    guideModalTitle = document.getElementById('guideModalTitle');
+    guideForm = document.getElementById('guideForm');
+    guideIdInput = document.getElementById('guideId');
+    guideTitleInput = document.getElementById('guideTitleInput');
+    guideDescInput = document.getElementById('guideDescInput');
+    guideNoteInput = document.getElementById('guideNoteInput');
+    guideVideoInput = document.getElementById('guideVideoInput');
+    currentVideoPath = document.getElementById('currentVideoPath');
+    stepsContainer = document.getElementById('stepsContainer');
+    btnAddStep = document.getElementById('btnAddStep');
+    btnCancelGuide = document.getElementById('btnCancelGuide');
+
+    if (btnAddStep) btnAddStep.addEventListener('click', () => addStepInput());
+    if (btnCancelGuide) btnCancelGuide.addEventListener('click', closeGuideModal);
+    if (guideForm) guideForm.addEventListener('submit', handleSaveGuide);
 }
 
 /**
  * Global Event Listeners
  */
 function setupGlobalEvents() {
-    // Tutup Drawer Overlay
-    if (closeOverlayBtn) {
-        closeOverlayBtn.addEventListener('click', closeDrawer);
-    }
-    if (backdrop) {
-        backdrop.addEventListener('click', closeDrawer);
-    }
+    if (closeOverlayBtn) closeOverlayBtn.addEventListener('click', closeDrawer);
+    if (backdrop) backdrop.addEventListener('click', closeAllModalsAndDrawer);
 
-    // Toggle Fullscreen
     if (fullscreenBtn) {
         fullscreenBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen();
             } else {
-                document.exitFullscreen();
+                if (document.exitFullscreen) document.exitFullscreen();
             }
         });
     }
@@ -76,7 +161,7 @@ async function fetchGuidesByGroup(groupId) {
 }
 
 /**
- * Fetch Semua Guides (Fallback)
+ * Fetch Semua Guides
  */
 async function fetchAllGuides() {
     try {
@@ -95,6 +180,7 @@ async function fetchAllGuides() {
 function renderListView() {
     closeDrawer();
 
+    const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
     const filteredGuides = state.guides.filter(g => 
         g.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
         (g.functionDesc && g.functionDesc.toLowerCase().includes(state.searchQuery.toLowerCase()))
@@ -121,9 +207,11 @@ function renderListView() {
                         <div class="backButton">
                             <button id="btnBackDashboard" title="Kembali ke Dashboard"><i class="fa-solid fa-arrow-left"></i></button>
                         </div>
-                        <div class="addGuideButton">
-                            <button id="btnAddGuide" title="Tambah Guide"><i class="fa-solid fa-plus"></i></button>
-                        </div>
+                        ${isAdmin ? `
+                            <div class="addGuideButton">
+                                <button id="btnAddGuide" title="Tambah Guide"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="guideCardContainer">
@@ -144,10 +232,13 @@ function renderListView() {
         </main>
     `;
 
-    // Event Listeners List Mode
     document.getElementById('btnBackDashboard').addEventListener('click', () => {
         window.location.href = 'index.html';
     });
+
+    if (isAdmin) {
+        document.getElementById('btnAddGuide')?.addEventListener('click', () => openAddGuideModal());
+    }
 
     const searchBar = document.getElementById('searchBar');
     const searchBtn = document.getElementById('searchBtn');
@@ -162,7 +253,6 @@ function renderListView() {
         if (e.key === 'Enter') handleSearch();
     });
 
-    // Event Listener Card Guide Click -> Masuk Video Mode
     document.querySelectorAll('.guideCard').forEach(card => {
         card.addEventListener('click', async () => {
             const id = card.getAttribute('data-id');
@@ -180,8 +270,6 @@ async function openGuideDetail(id) {
         if (!response.ok) throw new Error('Gagal memuat detail guide');
 
         state.currentGuide = await response.json();
-
-        // Increment View Count di Backend
         fetch(`${API_BASE}/guides/${id}/view`, { method: 'POST' }).catch(() => {});
 
         renderDetailView();
@@ -196,6 +284,7 @@ async function openGuideDetail(id) {
  */
 function renderDetailView() {
     const guide = state.currentGuide;
+    const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
 
     viewContainer.innerHTML = `
         <header class="detailHeader">
@@ -207,12 +296,14 @@ function renderDetailView() {
                 <div class="viewButton">
                     <button id="btnViewGuide" title="See Guide Detail"><i class="fa-regular fa-eye"></i></button>
                 </div>
-                <div class="editButton">
-                    <button id="btnEditGuide" title="Edit Guide"><i class="fa-solid fa-pen-to-square"></i></button>
-                </div>
-                <div class="deleteButton">
-                    <button id="btnDeleteGuide" title="Delete Guide"><i class="fa-solid fa-trash-can"></i></button>
-                </div>
+                ${isAdmin ? `
+                    <div class="editButton">
+                        <button id="btnEditGuide" title="Edit Guide"><i class="fa-solid fa-pen-to-square"></i></button>
+                    </div>
+                    <div class="deleteButton">
+                        <button id="btnDeleteGuide" title="Delete Guide"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                ` : ''}
             </div>
         </header>
         <main class="detailMain">
@@ -220,7 +311,6 @@ function renderDetailView() {
         </main>
     `;
 
-    // Event Listeners Video Mode
     document.getElementById('btnBackToList').addEventListener('click', () => {
         renderListView();
     });
@@ -229,11 +319,176 @@ function renderDetailView() {
         openDrawer(guide);
     });
 
-    document.getElementById('btnDeleteGuide').addEventListener('click', async () => {
-        if (confirm(`Apakah Anda yakin ingin menghapus guide "${guide.title}"?`)) {
-            await deleteGuide(guide.id);
-        }
+    if (isAdmin) {
+        document.getElementById('btnEditGuide')?.addEventListener('click', () => {
+            openEditGuideModal(guide);
+        });
+
+        document.getElementById('btnDeleteGuide')?.addEventListener('click', async () => {
+            if (confirm(`Apakah Anda yakin ingin menghapus guide "${guide.title}"?`)) {
+                await deleteGuide(guide.id);
+            }
+        });
+    }
+}
+
+// =============================================================
+// MODAL ADD / EDIT GUIDE LOGIC (ADMIN ONLY)
+// =============================================================
+
+function openAddGuideModal() {
+    if (!state.groupId) {
+        alert('Pilih Guide Group terlebih dahulu dari Dashboard.');
+        return;
+    }
+
+    if (!guideModal) return;
+
+    guideModalTitle.innerText = 'Add Guide';
+    guideForm.reset();
+    guideIdInput.value = '';
+    state.existingVideoUrl = '';
+    currentVideoPath.innerText = '';
+    stepsContainer.innerHTML = '';
+
+    addStepInput();
+
+    backdrop.classList.add('active');
+    guideModal.classList.add('active');
+}
+
+function openEditGuideModal(guide) {
+    if (!guideModal) return;
+
+    guideModalTitle.innerText = 'Edit Guide';
+    guideIdInput.value = guide.id;
+    guideTitleInput.value = guide.title;
+    guideDescInput.value = guide.functionDesc || '';
+    guideNoteInput.value = guide.importantNote || '';
+
+    state.existingVideoUrl = guide.videoUrl || '';
+    currentVideoPath.innerText = state.existingVideoUrl ? `Video saat ini: ${state.existingVideoUrl}` : '';
+
+    stepsContainer.innerHTML = '';
+    if (guide.steps && guide.steps.length > 0) {
+        guide.steps.forEach(step => {
+            const val = typeof step === 'string' ? step : step.stepDescription;
+            addStepInput(val);
+        });
+    } else {
+        addStepInput();
+    }
+
+    backdrop.classList.add('active');
+    guideModal.classList.add('active');
+}
+
+function closeGuideModal() {
+    backdrop?.classList.remove('active');
+    guideModal?.classList.remove('active');
+}
+
+function closeAllModalsAndDrawer() {
+    closeDrawer();
+    closeGuideModal();
+}
+
+function addStepInput(value = '') {
+    if (!stepsContainer) return;
+    const stepDiv = document.createElement('div');
+    stepDiv.className = 'stepItem';
+    stepDiv.innerHTML = `
+        <input type="text" class="stepInput" placeholder="Langkah guide..." value="${escapeHTML(value)}">
+        <button type="button" class="btnRemoveStep" title="Hapus Step"><i class="fa-solid fa-trash-can"></i></button>
+    `;
+
+    stepDiv.querySelector('.btnRemoveStep').addEventListener('click', () => {
+        stepDiv.remove();
     });
+
+    stepsContainer.appendChild(stepDiv);
+}
+
+async function handleSaveGuide(e) {
+    e.preventDefault();
+
+    const isEdit = Boolean(guideIdInput.value);
+    const id = guideIdInput.value;
+    const title = guideTitleInput.value.trim();
+    const functionDesc = guideDescInput.value.trim();
+    const importantNote = guideNoteInput.value.trim();
+    const videoFile = guideVideoInput.files[0];
+
+    const stepInputs = document.querySelectorAll('.stepInput');
+    const steps = Array.from(stepInputs)
+        .map(input => input.value.trim())
+        .filter(val => val !== '');
+
+    if (!videoFile && !state.existingVideoUrl) {
+        alert('Harap pilih file video untuk guide ini.');
+        return;
+    }
+
+    let videoUrl = state.existingVideoUrl;
+
+    try {
+        if (videoFile) {
+            const formData = new FormData();
+            formData.append('video', videoFile);
+            formData.append('title', title);
+
+            const uploadRes = await fetch(`${API_BASE}/upload-video`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json();
+                throw new Error(errData.error || 'Gagal mengunggah video');
+            }
+
+            const uploadData = await uploadRes.json();
+            videoUrl = uploadData.videoPath;
+        }
+
+        const payload = {
+            groupId: parseInt(state.groupId, 10),
+            title,
+            functionDesc,
+            importantNote,
+            videoUrl,
+            steps
+        };
+
+        const endpoint = isEdit ? `${API_BASE}/guides/${id}` : `${API_BASE}/guides`;
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(endpoint, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('Gagal menyimpan guide');
+
+        closeGuideModal();
+
+        if (state.groupId) {
+            await fetchGuidesByGroup(state.groupId);
+        } else {
+            await fetchAllGuides();
+        }
+
+        if (isEdit) {
+            await openGuideDetail(id);
+        } else {
+            renderListView();
+        }
+
+    } catch (error) {
+        console.error('Error saving guide:', error);
+        alert(error.message || 'Gagal menyimpan guide.');
+    }
 }
 
 /**
@@ -268,23 +523,14 @@ function openDrawer(guide) {
     detailOverlay.classList.add('active');
 }
 
-/**
- * Tutup Drawer Overlay
- */
 function closeDrawer() {
-    backdrop.classList.remove('active');
-    detailOverlay.classList.remove('active');
+    backdrop?.classList.remove('active');
+    detailOverlay?.classList.remove('active');
 }
 
-/**
- * Hapus Guide via API
- */
 async function deleteGuide(id) {
     try {
-        const response = await fetch(`${API_BASE}/guides/${id}`, {
-            method: 'DELETE'
-        });
-
+        const response = await fetch(`${API_BASE}/guides/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Gagal menghapus guide');
 
         alert('Guide berhasil dihapus.');
@@ -292,13 +538,10 @@ async function deleteGuide(id) {
         renderListView();
     } catch (error) {
         console.error('Error deleting guide:', error);
-        alert('Gagal menghapus guide. Pastikan Anda memiliki hak akses ITAdmin.');
+        alert('Gagal menghapus guide.');
     }
 }
 
-/**
- * Sanitasi HTML String (Mencegah XSS)
- */
 function escapeHTML(str) {
     if (!str) return '';
     return String(str).replace(/[&<>'"]/g, 
@@ -312,5 +555,4 @@ function escapeHTML(str) {
     );
 }
 
-// Inisialisasi saat DOM siap
 document.addEventListener('DOMContentLoaded', init);

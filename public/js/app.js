@@ -3,75 +3,193 @@ const state = {
     types: [],
     selectedTypeId: null,
     groups: [],
-    searchQuery: ''
+    searchQuery: '',
+    currentUser: null
 };
 
-// API Base URL
 const API_BASE = '/api';
-
 let currentExistingImgUrl = '';
 
-// DOM Elements
-const elements = {
-    typesContainer: document.getElementById('types'),
-    typeName: document.getElementById('typeName'),
-    typeDesc: document.getElementById('typeDesc'),
-    typeImageContainer: document.querySelector('.typeImage'),
-    guideGroupContainer: document.getElementById('guideGroup'),
-    searchBar: document.getElementById('searchBar'),
-    searchBtn: document.getElementById('searchBtn'),
-    fullscreenBtn: document.getElementById('fullscreen'),
-    
-    // Manage & Modal Elements (Type)
-    btnManage: document.getElementById('btnManage'),
-    backdrop: document.getElementById('backdrop'),
-    manageTypeModal: document.getElementById('manageTypeModal'),
-    closeManageModal: document.getElementById('closeManageModal'),
-    newTypeTitleInput: document.getElementById('newTypeTitleInput'),
-    btnSubmitAddType: document.getElementById('btnSubmitAddType'),
-    typeListManage: document.getElementById('typeListManage'),
-
-    // Edit Modal Elements (Type)
-    editTypeModal: document.getElementById('editTypeModal'),
-    closeEditModal: document.getElementById('closeEditModal'),
-    editTypeForm: document.getElementById('editTypeForm'),
-    editTypeId: document.getElementById('editTypeId'),
-    editTypeTitle: document.getElementById('editTypeTitle'),
-    editTypeDesc: document.getElementById('editTypeDesc'),
-    editTypeImgUrl: document.getElementById('editTypeImgUrl'),
-    editTypeImageInput: document.getElementById('editTypeImageInput'),
-    currentImgUrlPath: document.getElementById('currentImgUrlPath'),
-
-    // Manage & Modal Elements (Guide Group)
-    manageGroupModal: document.getElementById('manageGroupModal'),
-    closeManageGroupModal: document.getElementById('closeManageGroupModal'),
-    newGroupTitleInput: document.getElementById('newGroupTitleInput'),
-    btnSubmitAddGroup: document.getElementById('btnSubmitAddGroup'),
-    groupListManage: document.getElementById('groupListManage'),
-
-    // Edit Modal Elements (Guide Group)
-    editGroupModal: document.getElementById('editGroupModal'),
-    closeEditGroupModal: document.getElementById('closeEditGroupModal'),
-    editGroupForm: document.getElementById('editGroupForm'),
-    editGroupId: document.getElementById('editGroupId'),
-    editGroupTitle: document.getElementById('editGroupTitle'),
-    editGroupDesc: document.getElementById('editGroupDesc'),
-    editGroupOrder: document.getElementById('editGroupOrder')
-};
+// Dynamic Elements Cache
+let elements = {};
 
 /**
- * Initialize Dashboard
+ * Initialize Dashboard & Authenticate User
  */
 async function init() {
+    await checkUserAuth();
+    cacheDOMElements();
     setupEventListeners();
     await fetchAndRenderTypes();
 }
 
 /**
- * Global Event Listeners Setup
+ * Cek Autentikasi User & Inject Modal Admin jika ITAdmin
+ */
+async function checkUserAuth() {
+    try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+            state.currentUser = await response.json();
+        }
+    } catch (err) {
+        console.warn('Auth check failed:', err);
+    }
+
+    // Hanya jika role == 'ITAdmin', suntikkan elemen DOM khusus admin
+    if (state.currentUser && state.currentUser.role === 'ITAdmin') {
+        injectAdminDOM();
+    }
+}
+
+/**
+ * Injeksi elemen HTML khusus Admin ke dalam DOM
+ */
+function injectAdminDOM() {
+    // 1. Inject Tombol Manage Types
+    const typeManageContainer = document.getElementById('typeManageContainer');
+    if (typeManageContainer) {
+        typeManageContainer.innerHTML = `
+            <button id="btnManage" title="Manage Types"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
+        `;
+    }
+
+    // 2. Inject Modal Modals & Backdrop
+    const holder = document.getElementById('adminModalHolder');
+    if (holder) {
+        holder.innerHTML = `
+            <div id="backdrop" class="backdrop"></div>
+
+            <!-- Modal Manage Type -->
+            <div id="manageTypeModal" class="typeModal">
+                <div class="typeModalHeader">
+                    <h2>Manage Type Guide</h2>
+                    <button id="closeManageModal" class="closeModalBtn">&times;</button>
+                </div>
+                <div class="addTypeForm">
+                    <input type="text" id="newTypeTitleInput" placeholder="Masukkan judul type baru...">
+                    <button id="btnSubmitAddType" title="Tambah Type"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="typeListManage" class="typeListManage"></div>
+            </div>
+
+            <!-- Modal Edit Type Detail -->
+            <div id="editTypeModal" class="typeModal">
+                <div class="typeModalHeader">
+                    <h2>Edit Type Detail</h2>
+                    <button id="closeEditModal" class="closeModalBtn">&times;</button>
+                </div>
+                <form id="editTypeForm" class="editTypeForm">
+                    <input type="hidden" id="editTypeId">
+                    <div>
+                        <label>Title</label>
+                        <input type="text" id="editTypeTitle" required>
+                    </div>
+                    <div>
+                        <label>Description</label>
+                        <textarea id="editTypeDesc" rows="3" placeholder="Masukkan deskripsi..."></textarea>
+                    </div>
+                    <div>
+                        <label>Upload Gambar / Screenshot Flow</label>
+                        <input type="file" id="editTypeImageInput" accept="image/*">
+                        <small id="currentImgUrlPath" style="display:block; margin-top: 4px; color: var(--text2);"></small>
+                    </div>
+                    <button type="submit" class="btnSave">Simpan Perubahan</button>
+                </form>
+            </div>
+
+            <!-- Modal Manage Guide Groups -->
+            <div id="manageGroupModal" class="typeModal">
+                <div class="typeModalHeader">
+                    <h2>Manage Guide Group</h2>
+                    <button id="closeManageGroupModal" class="closeModalBtn">&times;</button>
+                </div>
+                <div class="addTypeForm">
+                    <input type="text" id="newGroupTitleInput" placeholder="Masukkan judul group baru...">
+                    <button id="btnSubmitAddGroup" title="Tambah Group"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="groupListManage" class="typeListManage"></div>
+            </div>
+
+            <!-- Modal Edit Guide Group Detail -->
+            <div id="editGroupModal" class="typeModal">
+                <div class="typeModalHeader">
+                    <h2>Edit Guide Group</h2>
+                    <button id="closeEditGroupModal" class="closeModalBtn">&times;</button>
+                </div>
+                <form id="editGroupForm" class="editTypeForm">
+                    <input type="hidden" id="editGroupId">
+                    <div>
+                        <label>Title</label>
+                        <input type="text" id="editGroupTitle" required>
+                    </div>
+                    <div>
+                        <label>Description</label>
+                        <textarea id="editGroupDesc" rows="3" placeholder="Masukkan deskripsi group..."></textarea>
+                    </div>
+                    <div>
+                        <label>Order Position</label>
+                        <input type="number" id="editGroupOrder" value="0">
+                    </div>
+                    <button type="submit" class="btnSave">Simpan Perubahan</button>
+                </form>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Cache Element Selectors
+ */
+function cacheDOMElements() {
+    elements = {
+        typesContainer: document.getElementById('types'),
+        typeName: document.getElementById('typeName'),
+        typeDesc: document.getElementById('typeDesc'),
+        typeImageContainer: document.querySelector('.typeImage'),
+        guideGroupContainer: document.getElementById('guideGroup'),
+        searchBar: document.getElementById('searchBar'),
+        searchBtn: document.getElementById('searchBtn'),
+        fullscreenBtn: document.getElementById('fullscreen'),
+
+        // Admin Elements (Akan ada jika di-inject)
+        btnManage: document.getElementById('btnManage'),
+        backdrop: document.getElementById('backdrop'),
+        manageTypeModal: document.getElementById('manageTypeModal'),
+        closeManageModal: document.getElementById('closeManageModal'),
+        newTypeTitleInput: document.getElementById('newTypeTitleInput'),
+        btnSubmitAddType: document.getElementById('btnSubmitAddType'),
+        typeListManage: document.getElementById('typeListManage'),
+
+        editTypeModal: document.getElementById('editTypeModal'),
+        closeEditModal: document.getElementById('closeEditModal'),
+        editTypeForm: document.getElementById('editTypeForm'),
+        editTypeId: document.getElementById('editTypeId'),
+        editTypeTitle: document.getElementById('editTypeTitle'),
+        editTypeDesc: document.getElementById('editTypeDesc'),
+        editTypeImageInput: document.getElementById('editTypeImageInput'),
+        currentImgUrlPath: document.getElementById('currentImgUrlPath'),
+
+        manageGroupModal: document.getElementById('manageGroupModal'),
+        closeManageGroupModal: document.getElementById('closeManageGroupModal'),
+        newGroupTitleInput: document.getElementById('newGroupTitleInput'),
+        btnSubmitAddGroup: document.getElementById('btnSubmitAddGroup'),
+        groupListManage: document.getElementById('groupListManage'),
+
+        editGroupModal: document.getElementById('editGroupModal'),
+        closeEditGroupModal: document.getElementById('closeEditGroupModal'),
+        editGroupForm: document.getElementById('editGroupForm'),
+        editGroupId: document.getElementById('editGroupId'),
+        editGroupTitle: document.getElementById('editGroupTitle'),
+        editGroupDesc: document.getElementById('editGroupDesc'),
+        editGroupOrder: document.getElementById('editGroupOrder')
+    };
+}
+
+/**
+ * Global Event Listeners
  */
 function setupEventListeners() {
-    // Search Events
     if (elements.searchBtn) elements.searchBtn.addEventListener('click', handleSearch);
     if (elements.searchBar) {
         elements.searchBar.addEventListener('keypress', (e) => {
@@ -79,7 +197,6 @@ function setupEventListeners() {
         });
     }
 
-    // Fullscreen Toggle
     if (elements.fullscreenBtn) {
         elements.fullscreenBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -87,7 +204,7 @@ function setupEventListeners() {
         });
     }
 
-    // Modal Manage Type
+    // Event listener admin hanya diaktifkan jika elemen ter-inject
     if (elements.btnManage) elements.btnManage.addEventListener('click', openManageModal);
     if (elements.closeManageModal) elements.closeManageModal.addEventListener('click', closeAllModals);
     if (elements.closeEditModal) elements.closeEditModal.addEventListener('click', closeAllModals);
@@ -101,7 +218,6 @@ function setupEventListeners() {
     }
     if (elements.editTypeForm) elements.editTypeForm.addEventListener('submit', handleUpdateType);
 
-    // Modal Manage Guide Group
     if (elements.closeManageGroupModal) elements.closeManageGroupModal.addEventListener('click', closeAllModals);
     if (elements.closeEditGroupModal) elements.closeEditGroupModal.addEventListener('click', closeAllModals);
     if (elements.btnSubmitAddGroup) elements.btnSubmitAddGroup.addEventListener('click', handleCreateGroup);
@@ -114,7 +230,7 @@ function setupEventListeners() {
 }
 
 /**
- * Fetch All Types & Render Navigation Tabs
+ * Fetch All Types
  */
 async function fetchAndRenderTypes() {
     try {
@@ -148,7 +264,6 @@ function renderTypeTabs() {
         const typeTab = document.createElement('div');
         const isActive = type.id === state.selectedTypeId;
         typeTab.className = `typeButton ${isActive ? 'active' : ''}`;
-        
         typeTab.innerHTML = `<h1>${escapeHTML(type.title)}</h1>`;
 
         typeTab.addEventListener('click', () => {
@@ -161,9 +276,6 @@ function renderTypeTabs() {
     });
 }
 
-/**
- * Handle Type Tab Selection
- */
 async function selectType(typeId) {
     state.selectedTypeId = typeId;
     renderTypeTabs();
@@ -216,32 +328,31 @@ async function fetchAndRenderGuideGroups(typeId) {
 }
 
 function renderGuideGroups(groups) {
-    // 1. Buat struktur HTML header + isi list/pesan kosong sekaligus
+    const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
+
     let contentHTML = `
         <div class="guideHeader">
             <h1>Guide</h1>
-            <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
-                <i class="fa-solid fa-folder-plus"></i>
-            </button>
+            ${isAdmin ? `
+                <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
+                    <i class="fa-solid fa-folder-plus"></i>
+                </button>
+            ` : ''}
         </div>
     `;
 
     if (groups.length === 0) {
         contentHTML += '<p style="margin-top:1rem;">No guides available in this group.</p>';
         elements.guideGroupContainer.innerHTML = contentHTML;
-
-        // 2. Pasang event listener SETELAH innerHTML selesai diperbarui
-        document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
+        if (isAdmin) document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
         return;
     }
 
-    // Render list jika data groups ada
     elements.guideGroupContainer.innerHTML = contentHTML;
 
     groups.forEach((group) => {
         const groupCard = document.createElement('div');
         groupCard.className = 'guideGroup';
-        groupCard.style.marginBottom = '0.5rem';
         groupCard.innerHTML = `
             <h1>${escapeHTML(group.title)}</h1>
             <i class="fa-solid fa-angle-right fa-xl"></i>
@@ -251,22 +362,21 @@ function renderGuideGroups(groups) {
         elements.guideGroupContainer.appendChild(groupCard);
     });
 
-    // Pasang event listener untuk tombol manage
-    document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
+    if (isAdmin) document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
 }
 
 // =============================================================
-// MODAL CRUD TYPE MANAGEMENT
+// MODAL CRUD TYPE MANAGEMENT (ADMIN ONLY)
 // =============================================================
 
 function openManageModal() {
     renderManageTypeList();
-    elements.backdrop.classList.add('active');
-    elements.manageTypeModal.classList.add('active');
+    elements.backdrop?.classList.add('active');
+    elements.manageTypeModal?.classList.add('active');
 }
 
 function closeAllModals() {
-    elements.backdrop.classList.remove('active');
+    elements.backdrop?.classList.remove('active');
     elements.manageTypeModal?.classList.remove('active');
     elements.editTypeModal?.classList.remove('active');
     elements.manageGroupModal?.classList.remove('active');
@@ -300,25 +410,16 @@ function renderManageTypeList() {
     });
 }
 
-/**
- * Tambah Type Baru (Cek duplikasi judul terlebih dahulu)
- */
 async function handleCreateType() {
     const title = elements.newTypeTitleInput.value.trim();
-    
-    // 1. Validasi input tidak boleh kosong
     if (!title) {
         alert('Judul Type tidak boleh kosong!');
         return;
     }
 
-    // 2. Cek apakah nama type sudah ada (case-insensitive)
-    const isDuplicate = state.types.some(
-        type => type.title.trim().toLowerCase() === title.toLowerCase()
-    );
-
+    const isDuplicate = state.types.some(t => t.title.trim().toLowerCase() === title.toLowerCase());
     if (isDuplicate) {
-        alert(`Peringatan: Type dengan nama "${title}" sudah ada. Silakan gunakan nama lain!`);
+        alert(`Peringatan: Type dengan nama "${title}" sudah ada!`);
         return;
     }
 
@@ -326,11 +427,7 @@ async function handleCreateType() {
         const response = await fetch(`${API_BASE}/types`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                title: title,
-                description: "", // String kosong agar lolos NOT NULL di DB
-                imgUrl: ""       // String kosong agar lolos NOT NULL di DB
-            })
+            body: JSON.stringify({ title, description: "", imgUrl: "" })
         });
 
         if (!response.ok) throw new Error('Gagal menambah Type');
@@ -341,7 +438,7 @@ async function handleCreateType() {
 
     } catch (error) {
         console.error('Error creating type:', error);
-        alert('Gagal membuat type. Pastikan Anda memiliki otorisasi ITAdmin.');
+        alert('Gagal membuat type.');
     }
 }
 
@@ -384,10 +481,7 @@ async function handleUpdateType(e) {
                 body: formData
             });
 
-            if (!uploadRes.ok) {
-                const errData = await uploadRes.json();
-                throw new Error(errData.error || 'Gagal mengunggah gambar');
-            }
+            if (!uploadRes.ok) throw new Error('Gagal mengunggah gambar');
 
             const uploadData = await uploadRes.json();
             finalImgUrl = uploadData.imgUrl;
@@ -407,7 +501,7 @@ async function handleUpdateType(e) {
 
     } catch (error) {
         console.error('Error updating type:', error);
-        alert(error.message || 'Gagal mengupdate type.');
+        alert('Gagal mengupdate type.');
     }
 }
 
@@ -433,17 +527,14 @@ async function handleDeleteType(id, title) {
 }
 
 // =============================================================
-// MODAL CRUD GUIDE GROUP MANAGEMENT
+// MODAL CRUD GUIDE GROUP MANAGEMENT (ADMIN ONLY)
 // =============================================================
 
 function openManageGroupModal() {
-    if (!state.selectedTypeId) {
-        alert('Pilih Type terlebih dahulu');
-        return;
-    }
+    if (!state.selectedTypeId) return;
     renderManageGroupList();
-    elements.backdrop.classList.add('active');
-    elements.manageGroupModal.classList.add('active');
+    elements.backdrop?.classList.add('active');
+    elements.manageGroupModal?.classList.add('active');
 }
 
 function renderManageGroupList() {
@@ -451,7 +542,7 @@ function renderManageGroupList() {
     elements.groupListManage.innerHTML = '';
 
     if (state.groups.length === 0) {
-        elements.groupListManage.innerHTML = '<p style="text-align:center;">Belum ada Guide Group untuk Type ini.</p>';
+        elements.groupListManage.innerHTML = '<p style="text-align:center;">Belum ada Guide Group.</p>';
         return;
     }
 
@@ -476,7 +567,7 @@ function renderManageGroupList() {
 async function handleCreateGroup() {
     const title = elements.newGroupTitleInput.value.trim();
     if (!title) {
-        alert('Judul Guide Group tidak boleh kosong');
+        alert('Judul Guide Group tidak boleh kosong!');
         return;
     }
 

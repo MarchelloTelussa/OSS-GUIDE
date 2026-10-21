@@ -300,10 +300,25 @@ function renderManageTypeList() {
     });
 }
 
+/**
+ * Tambah Type Baru (Cek duplikasi judul terlebih dahulu)
+ */
 async function handleCreateType() {
     const title = elements.newTypeTitleInput.value.trim();
+    
+    // 1. Validasi input tidak boleh kosong
     if (!title) {
-        alert('Judul Type tidak boleh kosong');
+        alert('Judul Type tidak boleh kosong!');
+        return;
+    }
+
+    // 2. Cek apakah nama type sudah ada (case-insensitive)
+    const isDuplicate = state.types.some(
+        type => type.title.trim().toLowerCase() === title.toLowerCase()
+    );
+
+    if (isDuplicate) {
+        alert(`Peringatan: Type dengan nama "${title}" sudah ada. Silakan gunakan nama lain!`);
         return;
     }
 
@@ -311,7 +326,11 @@ async function handleCreateType() {
         const response = await fetch(`${API_BASE}/types`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description: "", imgUrl: "" })
+            body: JSON.stringify({
+                title: title,
+                description: "", // String kosong agar lolos NOT NULL di DB
+                imgUrl: ""       // String kosong agar lolos NOT NULL di DB
+            })
         });
 
         if (!response.ok) throw new Error('Gagal menambah Type');
@@ -322,7 +341,7 @@ async function handleCreateType() {
 
     } catch (error) {
         console.error('Error creating type:', error);
-        alert('Gagal membuat type.');
+        alert('Gagal membuat type. Pastikan Anda memiliki otorisasi ITAdmin.');
     }
 }
 

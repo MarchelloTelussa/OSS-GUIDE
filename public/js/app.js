@@ -17,9 +17,9 @@ let elements = {};
  * Initialize Dashboard & Authenticate User
  */
 async function init() {
-    await checkUserAuth();
-    cacheDOMElements();
-    setupEventListeners();
+    await checkUserAuth(); // Inject DOM admin terlebih dahulu
+    cacheDOMElements();     // Cache elemen DOM setelah elemen admin ter-inject
+    setupEventListeners(); // Pasang event listeners pada seluruh elemen
     await fetchAndRenderTypes();
 }
 
@@ -146,6 +146,7 @@ function cacheDOMElements() {
         typesContainer: document.getElementById('types'),
         typeName: document.getElementById('typeName'),
         typeDesc: document.getElementById('typeDesc'),
+        typeIdentityContainer: document.querySelector('.typeIdentity'),
         typeImageContainer: document.querySelector('.typeImage'),
         guideGroupContainer: document.getElementById('guideGroup'),
         searchBar: document.getElementById('searchBar'),
@@ -305,9 +306,23 @@ function renderTypeImage(imgUrl) {
 
     if (imgUrl) {
         elements.typeImageContainer.innerHTML = `
-            <img src="${escapeHTML(imgUrl)}" alt="Type Image" onerror="this.onerror=null; this.src='./img/screenshot.png';">
+            <img id="typeImgElement" src="${escapeHTML(imgUrl)}" alt="Type Image" onerror="this.onerror=null; this.src='./img/screenshot.png';">
         `;
+
+        const imgElement = document.getElementById('typeImgElement');
+        if (imgElement && elements.typeIdentityContainer) {
+            imgElement.onload = function () {
+                if (this.naturalHeight > this.naturalWidth) {
+                    elements.typeIdentityContainer.classList.add('is-vertical');
+                } else {
+                    elements.typeIdentityContainer.classList.remove('is-vertical');
+                }
+            };
+        }
     } else {
+        if (elements.typeIdentityContainer) {
+            elements.typeIdentityContainer.classList.remove('is-vertical');
+        }
         elements.typeImageContainer.innerHTML = `
             <p style="padding-top:1rem;">No image available.</p>
         `;
@@ -413,16 +428,13 @@ function renderManageTypeList() {
 async function handleCreateType() {
     const title = elements.newTypeTitleInput.value.trim();
     
-    // 1. Validasi input tidak boleh kosong
     if (!title) {
         alert('Judul Type tidak boleh kosong!');
         return;
     }
 
-    // Normalisasi input user (hapus spasi & ubah ke huruf kecil)
     const normalizedInput = title.toLowerCase().replace(/\s+/g, '');
 
-    // 2. Cek apakah nama type sudah ada (abaikan spasi dan case)
     const isDuplicate = state.types.some(type => {
         const normalizedExisting = type.title.trim().toLowerCase().replace(/\s+/g, '');
         return normalizedExisting === normalizedInput;
@@ -462,7 +474,7 @@ async function handleCreateType() {
 function openEditTypeModal(type) {
     elements.editTypeId.value = type.id;
     elements.editTypeTitle.value = type.title;
-    elements.editTypeTitle.dataset.originalTitle = type.title; // Simpan judul asli untuk pengecekan lokal
+    elements.editTypeTitle.dataset.originalTitle = type.title;
     elements.editTypeDesc.value = type.description || '';
     
     currentExistingImgUrl = type.imgUrl || '';
@@ -491,12 +503,10 @@ async function handleUpdateType(e) {
         return;
     }
 
-    // Normalisasi input baru (hapus spasi & ubah ke huruf kecil)
     const normalizedInput = title.toLowerCase().replace(/\s+/g, '');
 
-    // Cek duplikasi dengan Type lain (abaikan spasi dan case)
     const isDuplicate = state.types.some(type => {
-        if (type.id === parseInt(id, 10)) return false; // Abaikan Type yang sedang di-edit
+        if (type.id === parseInt(id, 10)) return false;
         const normalizedExisting = type.title.trim().toLowerCase().replace(/\s+/g, '');
         return normalizedExisting === normalizedInput;
     });

@@ -27,9 +27,6 @@ app.use((req, res, next) => {
     if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Silakan login terlebih dahulu' });
     return res.redirect('/login.html');
   }
-  
-  if (req.path === '/add-guide.html' && req.user.role !== 'ITAdmin') return res.redirect('/');
-  if (req.path === '/edit-guide.html' && req.user.role !== 'ITAdmin') return res.redirect('/');
 
   next();
 });

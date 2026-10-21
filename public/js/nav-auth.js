@@ -1,6 +1,5 @@
 // Mengisi navbar sesuai user yang login: nama, tombol logout, dan menu Add Guide (khusus ITAdmin)
 const userLink = document.getElementById('user');
-const addGuideLink = document.querySelector('a[href="add-guide.html"]');
 const manageTypeButton = document.querySelector('#bttnManage');
 
 export async function getUserInfo() {
@@ -22,13 +21,6 @@ export async function getUserInfo() {
         if (userLink) {
             userLink.querySelector('i').textContent = ` ${user.username}`;
             userLink.title = 'Klik untuk logout';
-        }
-
-        // Hilangkan menu Add Guide jika bukan ITAdmin
-        if (addGuideLink && user.role !== 'ITAdmin') {
-            const a = addGuideLink.closest('a');
-            if (a) a.remove();
-            else addGuideLink.remove();
         }
 
         if (manageTypeButton && user.role !== 'ITAdmin') {

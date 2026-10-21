@@ -8,13 +8,13 @@ import { fileURLToPath } from 'url';
 const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
+const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
-
-const ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.mov', '.webm', '.ogv', '.ogg'];
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
 
 const taskLocks = new Map();
 
@@ -41,6 +41,37 @@ function looksLikeVideo(buf, ext) {
     if (['.mp4', '.m4v', '.mov'].includes(ext)) return buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp';
     if (ext === '.webm') return buf.length > 4 && buf.readUInt32BE(0) === 0x1A45DFA3;
     return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS';
+}
+
+/**
+ * Helper untuk menghapus file fisik beserta folder parent-nya jika kosong
+ */
+function cleanupFileAndParentDir(relPath) {
+    if (!relPath) return;
+
+    let cleanPath = relPath.trim();
+    cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+    const absolutePath = path.join(__dirname, '../public', cleanPath);
+
+    try {
+        if (fs.existsSync(absolutePath)) {
+            fs.unlinkSync(absolutePath);
+
+            // Hapus folder parent (misal folder guide) jika kosong
+            const parentDir = path.dirname(absolutePath);
+            if (fs.existsSync(parentDir) && fs.readdirSync(parentDir).length === 0) {
+                fs.rmdirSync(parentDir);
+
+                // Hapus folder grandparent (misal folder type) jika kosong
+                const grandParentDir = path.dirname(parentDir);
+                if (fs.existsSync(grandParentDir) && fs.readdirSync(grandParentDir).length === 0) {
+                    fs.rmdirSync(grandParentDir);
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('Pembersihan file fisik gagal:', err.message);
+    }
 }
 
 // =============================================================
@@ -113,8 +144,8 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         const { rows } = await db.query(queryText, [
             title.trim(), 
-            description || null, 
-            imgUrl || null
+            description || '', 
+            imgUrl || ''
         ]);
 
         res.status(201).json(rows[0]);
@@ -124,6 +155,7 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
 });
 
 // PUT update type (ITAdmin only)
+// PUT update type (ITAdmin only + Auto-Rename Folder & Path Sync)
 router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const { title, description, imgUrl } = req.body;
@@ -132,46 +164,141 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         return res.status(400).json({ error: 'Title field is required' });
     }
 
+    const client = await db.getClient();
     try {
-        const queryText = `
+        await client.query('BEGIN');
+
+        // 1. Ambil data lama sebelum di-update
+        const oldTypeRes = await client.query('SELECT title, image_url FROM type WHERE id = $1', [id]);
+        if (oldTypeRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Type not found' });
+        }
+
+        const oldTitle = oldTypeRes.rows[0].title;
+        const newTitle = title.trim();
+
+        // 2. Sanitasi nama folder lama dan baru
+        const oldSafeFolder = oldTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+        const newSafeFolder = newTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+
+        let finalImgUrl = imgUrl || '';
+
+        // 3. Jika nama Type berubah, ubah nama folder fisik di server
+        if (oldSafeFolder !== newSafeFolder) {
+            // A. Rename Folder Gambar (/public/img/{old} -> /public/img/{new})
+            const oldImgDir = path.join(__dirname, '../public/img', oldSafeFolder);
+            const newImgDir = path.join(__dirname, '../public/img', newSafeFolder);
+
+            if (fs.existsSync(oldImgDir)) {
+                if (!fs.existsSync(path.dirname(newImgDir))) {
+                    fs.mkdirSync(path.dirname(newImgDir), { recursive: true });
+                }
+                fs.renameSync(oldImgDir, newImgDir);
+            }
+
+            // Update path image_url jika gambar masih menggunakan folder lama
+            if (finalImgUrl && finalImgUrl.includes(`/img/${oldSafeFolder}/`)) {
+                finalImgUrl = finalImgUrl.replace(`/img/${oldSafeFolder}/`, `/img/${newSafeFolder}/`);
+            }
+
+            // B. Rename Folder Video (/public/videos/{old} -> /public/videos/{new})
+            const oldVideoDir = path.join(__dirname, '../public/videos', oldSafeFolder);
+            const newVideoDir = path.join(__dirname, '../public/videos', newSafeFolder);
+
+            if (fs.existsSync(oldVideoDir)) {
+                if (!fs.existsSync(path.dirname(newVideoDir))) {
+                    fs.mkdirSync(path.dirname(newVideoDir), { recursive: true });
+                }
+                fs.renameSync(oldVideoDir, newVideoDir);
+            }
+
+            // C. Sync seluruh video_url di tabel 'guide' yang terikat dengan Type ini
+            const updateGuideVideosQuery = `
+                UPDATE guide
+                SET video_url = REPLACE(video_url, $1, $2)
+                WHERE group_id IN (
+                    SELECT id FROM guide_groups WHERE type_id = $3
+                ) AND video_url LIKE $4;
+            `;
+            const oldPathPrefix = `/videos/${oldSafeFolder}/`;
+            const newPathPrefix = `/videos/${newSafeFolder}/`;
+
+            await client.query(updateGuideVideosQuery, [
+                oldPathPrefix,
+                newPathPrefix,
+                id,
+                `${oldPathPrefix}%`
+            ]);
+        }
+
+        // 4. Update tabel Type di Database
+        const updateTypeQuery = `
             UPDATE type
             SET title = $1, description = $2, image_url = $3
             WHERE id = $4
             RETURNING id, title, description, image_url AS "imgUrl";
         `;
-        const { rows } = await db.query(queryText, [
-            title.trim(), 
-            description || null, 
-            imgUrl || null, 
+        const { rows } = await client.query(updateTypeQuery, [
+            newTitle, 
+            description || '', 
+            finalImgUrl, 
             id
         ]);
 
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Type not found' });
-        }
+        await client.query('COMMIT');
 
+        // Verifikasi langkah: Pastikan respons mengembalikan data Type yang telah diubah
         res.json(rows[0]);
+
     } catch (error) {
+        await client.query('ROLLBACK');
         next(error);
+    } finally {
+        client.release();
     }
 });
 
-// DELETE type (ITAdmin only)
+// DELETE type (ITAdmin only + File & Folder Cleanup)
 router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     try {
-        const queryText = `
-            DELETE FROM type
-            WHERE id = $1
-            RETURNING id;
-        `;
-        const { rows } = await db.query(queryText, [id]);
-
-        if (rows.length === 0) {
+        // Ambil info title dan img_url untuk pembersihan berkas
+        const typeRes = await db.query('SELECT title, image_url FROM type WHERE id = $1', [id]);
+        if (typeRes.rows.length === 0) {
             return res.status(404).json({ error: 'Type not found' });
         }
 
-        res.json({ message: 'Type successfully deleted', deletedId: rows[0].id });
+        const { title, image_url } = typeRes.rows[0];
+
+        // Ambil semua video_url guide di bawah Type ini
+        const videosRes = await db.query(`
+            SELECT g.video_url 
+            FROM guide g 
+            JOIN guide_groups gg ON g.group_id = gg.id 
+            WHERE gg.type_id = $1
+        `, [id]);
+
+        // Hapus rekord Type dari DB (Cascade)
+        await db.query('DELETE FROM type WHERE id = $1', [id]);
+
+        // Bersihkan gambar fisik type
+        if (image_url) cleanupFileAndParentDir(image_url);
+
+        // Bersihkan seluruh video fisik di bawah type ini
+        videosRes.rows.forEach(row => {
+            if (row.video_url) cleanupFileAndParentDir(row.video_url);
+        });
+
+        // Hapus folder fisik type jika ada
+        const safeTypeFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+        const imgTypeDir = path.join(__dirname, '../public/img', safeTypeFolder);
+        const videoTypeDir = path.join(__dirname, '../public/videos', safeTypeFolder);
+
+        if (fs.existsSync(imgTypeDir)) fs.rmSync(imgTypeDir, { recursive: true, force: true });
+        if (fs.existsSync(videoTypeDir)) fs.rmSync(videoTypeDir, { recursive: true, force: true });
+
+        res.json({ message: 'Type successfully deleted', deletedId: id });
     } catch (error) {
         next(error);
     }
@@ -222,7 +349,7 @@ router.get('/groups/:id', async (req, res, next) => {
                             'id', g.id,
                             'title', g.title,
                             'functionDesc', g.function_desc,
-                            'viewcount', g.viewcount
+                            'views', g.viewcount
                         ) ORDER BY g.id ASC
                     ) FILTER (WHERE g.id IS NOT NULL),
                     '[]'
@@ -259,7 +386,7 @@ router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
         const { rows } = await db.query(queryText, [
             typeId,
             title.trim(),
-            description || null,
+            description || '',
             groupOrder || 0
         ]);
 
@@ -269,37 +396,77 @@ router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// PUT update guide group (ITAdmin only)
-router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+// PUT update guide (ITAdmin only)
+router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
-    const { typeId, title, description, groupOrder } = req.body;
+    const guideId = parseInt(id, 10);
 
-    if (!typeId || !title || !title.trim()) {
-        return res.status(400).json({ error: 'typeId and title are required' });
+    if (isNaN(guideId)) {
+        return res.status(400).json({ error: 'Invalid ID' });
     }
 
+    const client = await db.getClient();
     try {
-        const queryText = `
-            UPDATE guide_groups
-            SET type_id = $1, title = $2, description = $3, group_order = $4
-            WHERE id = $5
-            RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
-        `;
-        const { rows } = await db.query(queryText, [
-            typeId,
-            title.trim(),
-            description || null,
-            groupOrder || 0,
-            id
-        ]);
+        const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Guide Group not found' });
+        if (!groupId || !title || !functionDesc) {
+            return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
         }
 
-        res.json(rows[0]);
+        await client.query('BEGIN');
+
+        // 1. Ambil data video_url lama dari database sebelum di-update
+        const oldGuideRes = await client.query('SELECT video_url FROM guide WHERE id = $1', [guideId]);
+        if (oldGuideRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Guide tidak ditemukan' });
+        }
+        const oldVideoUrl = oldGuideRes.rows[0].video_url;
+
+        // 2. Update data guide di database
+        const updateGuideQuery = `
+            UPDATE guide
+            SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5
+            WHERE id = $6
+            RETURNING id;
+        `;
+        const { rows } = await client.query(updateGuideQuery, [
+            groupId,
+            title.trim(),
+            functionDesc,
+            importantNote || '',
+            videoUrl || '',
+            guideId
+        ]);
+
+        // 3. Replace steps
+        await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
+
+        if (Array.isArray(steps) && steps.length > 0) {
+            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+            for (let i = 0; i < cleanSteps.length; i++) {
+                await client.query(
+                    `INSERT INTO guide_steps (guide_id, step_order, step_description)
+                     VALUES ($1, $2, $3);`,
+                    [guideId, i + 1, cleanSteps[i]]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+
+        // 4. PEMBERSIHAN: Jika ada video baru dan videoUrl lama berbeda, hapus video lama dari server
+        if (oldVideoUrl && videoUrl && oldVideoUrl !== videoUrl) {
+            cleanupFileAndParentDir(oldVideoUrl);
+        }
+
+        res.json({ message: 'Guide updated successfully', id: guideId });
+
     } catch (error) {
+        await client.query('ROLLBACK');
         next(error);
+    } finally {
+        client.release();
     }
 });
 
@@ -340,7 +507,6 @@ router.get('/guides', async (req, res, next) => {
                 g.function_desc AS "functionDesc",
                 g.important_note AS "importantNote",
                 g.video_url AS "videoUrl",
-                g.video_description AS "videoDescription",
                 g.viewcount AS "views"
             FROM guide g
         `;
@@ -372,7 +538,6 @@ router.get('/guides/:id', async (req, res, next) => {
                 g.function_desc AS "functionDesc",
                 g.important_note AS "importantNote",
                 g.video_url AS "videoUrl",
-                g.video_description AS "videoDescription",
                 g.viewcount AS "views",
                 COALESCE(
                     json_agg(
@@ -424,7 +589,7 @@ router.post('/guides/:id/view', async (req, res, next) => {
 router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     const client = await db.getClient();
     try {
-        const { groupId, title, functionDesc, importantNote, videoUrl, videoDescription, steps } = req.body;
+        const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
         if (!groupId || !title || !functionDesc) {
             return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
@@ -433,17 +598,16 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
         await client.query('BEGIN');
 
         const guideQuery = `
-            INSERT INTO guide (group_id, title, function_desc, important_note, video_url, video_description)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO guide (group_id, title, function_desc, important_note, video_url)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING id;
         `;
         const guideResult = await client.query(guideQuery, [
             groupId,
             title.trim(),
             functionDesc,
-            importantNote || null,
-            videoUrl || null,
-            videoDescription || null
+            importantNote || '',
+            videoUrl || ''
         ]);
         const guideId = guideResult.rows[0].id;
 
@@ -484,7 +648,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
     const client = await db.getClient();
     try {
-        const { groupId, title, functionDesc, importantNote, videoUrl, videoDescription, steps } = req.body;
+        const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
         if (!groupId || !title || !functionDesc) {
             return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
@@ -494,17 +658,16 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         const updateGuideQuery = `
             UPDATE guide
-            SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5, video_description = $6
-            WHERE id = $7
+            SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5
+            WHERE id = $6
             RETURNING id;
         `;
         const { rows } = await client.query(updateGuideQuery, [
             groupId,
             title.trim(),
             functionDesc,
-            importantNote || null,
-            videoUrl || null,
-            videoDescription || null,
+            importantNote || '',
+            videoUrl || '',
             guideId
         ]);
 
@@ -539,7 +702,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// DELETE guide (ITAdmin only)
+// DELETE guide (ITAdmin only + File & Folder Cleanup)
 router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
@@ -567,22 +730,12 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
             const videoUrl = rows[0].videoUrl;
 
-            // Optional video file removal if local file path is tracked
-            if (videoUrl) {
-                let cleanPath = videoUrl.trim();
-                cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
-                const absoluteFilePath = path.join(__dirname, '../public', cleanPath);
-
-                try {
-                    if (fs.existsSync(absoluteFilePath)) {
-                        fs.unlinkSync(absoluteFilePath);
-                    }
-                } catch (fileErr) {
-                    console.warn(`Failed to delete associated video file:`, fileErr.message);
-                }
-            }
-
             await client.query('COMMIT');
+
+            // Hapus file video fisik beserta foldernya jika ada
+            if (videoUrl) {
+                cleanupFileAndParentDir(videoUrl);
+            }
 
             res.json({
                 message: 'Guide deleted successfully',
@@ -599,9 +752,10 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 });
 
 // =============================================================
-// 4. FILE UPLOAD ROUTE (ITAdmin only)
+// 4. FILE UPLOAD ROUTES (ITAdmin only)
 // =============================================================
 
+// Endpoint Upload Video: /public/videos/{typeName}/{guideTitle}/{filename}
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const chunks = [];
@@ -621,7 +775,7 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
             chunks.push(chunk);
         });
 
-        req.on('end', () => {
+        req.on('end', async () => {
             if (tooLarge) return;
             try {
                 const buffer = Buffer.concat(chunks);
@@ -642,9 +796,16 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 let videoBuffer = null;
                 let videoFilename = '';
+                let groupIdParam = null;
                 let titleParam = 'untitled';
 
+                // Parsing multipart form data secara manual
                 for (const part of parts) {
+                    if (part.includes('name="groupId"')) {
+                        const contentStart = part.indexOf('\r\n\r\n') + 4;
+                        const contentEnd = part.lastIndexOf('\r\n');
+                        groupIdParam = part.substring(contentStart, contentEnd).trim();
+                    }
                     if (part.includes('name="title"')) {
                         const contentStart = part.indexOf('\r\n\r\n') + 4;
                         const contentEnd = part.lastIndexOf('\r\n');
@@ -673,8 +834,29 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                     });
                 }
 
+                // -------------------------------------------------------------
+                // BUKTI LOGIKA: CARI NAMA TYPE DARI DATABASE BERDASARKAN groupId
+                // -------------------------------------------------------------
+                let typeNameFound = 'general';
+                if (groupIdParam) {
+                    const typeQuery = `
+                        SELECT t.title 
+                        FROM guide_groups gg 
+                        JOIN type t ON gg.type_id = t.id 
+                        WHERE gg.id = $1;
+                    `;
+                    const typeResult = await db.query(typeQuery, [groupIdParam]);
+                    if (typeResult.rows.length > 0) {
+                        typeNameFound = typeResult.rows[0].title;
+                    }
+                }
+
+                // Sanitasi nama folder agar aman di sistem berkas (Linux/Windows)
+                const safeTypeFolder = typeNameFound.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
                 const safeTitleFolder = titleParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
-                const targetDir = path.join(__dirname, '../public/videos', safeTitleFolder);
+                
+                // Target: /public/videos/{typeName}/{guideTitle}
+                const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
                 if (!fs.existsSync(targetDir)) {
                     fs.mkdirSync(targetDir, { recursive: true });
@@ -686,7 +868,7 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 fs.writeFileSync(filepath, videoBuffer);
 
-                const videoUrl = `/videos/${safeTitleFolder}/${safeFilename}`;
+                const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
                 return res.json({ videoPath: videoUrl });
 
             } catch (error) {
@@ -698,6 +880,7 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
+// Endpoint Upload Gambar: /public/img/{typeName}/{filename}
 router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const chunks = [];
@@ -769,7 +952,6 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
                     });
                 }
 
-                // Sanitasi nama folder tipe
                 const safeTypeFolder = typeNameParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
                 const targetDir = path.join(__dirname, '../public/img', safeTypeFolder);
 
@@ -783,7 +965,6 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 fs.writeFileSync(filepath, imageBuffer);
 
-                // Path relatif yang akan disimpan ke kolom img_url di DB
                 const imageRelPath = `/img/${safeTypeFolder}/${safeFilename}`;
                 return res.json({ imgUrl: imageRelPath });
 

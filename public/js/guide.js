@@ -419,23 +419,33 @@ async function handleSaveGuide(e) {
     const importantNote = guideNoteInput.value.trim();
     const videoFile = guideVideoInput.files[0];
 
+    // Array steps yang sudah dibersihkan dari string kosong
     const stepInputs = document.querySelectorAll('.stepInput');
     const steps = Array.from(stepInputs)
         .map(input => input.value.trim())
         .filter(val => val !== '');
 
+    // Validasi video wajib ada (baik file baru maupun videoUrl lama saat edit)
     if (!videoFile && !state.existingVideoUrl) {
         alert('Harap pilih file video untuk guide ini.');
+        return;
+    }
+
+    // Validasi groupId wajib ada
+    if (!state.groupId) {
+        alert('Group ID tidak valid. Silakan pilih Guide Group terlebih dahulu.');
         return;
     }
 
     let videoUrl = state.existingVideoUrl;
 
     try {
+        // 1. Upload Video Baru jika Pengguna Memilih File
         if (videoFile) {
             const formData = new FormData();
             formData.append('video', videoFile);
             formData.append('title', title);
+            formData.append('groupId', state.groupId); // Mengirim groupId ke backend
 
             const uploadRes = await fetch(`${API_BASE}/upload-video`, {
                 method: 'POST',
@@ -448,9 +458,10 @@ async function handleSaveGuide(e) {
             }
 
             const uploadData = await uploadRes.json();
-            videoUrl = uploadData.videoPath;
+            videoUrl = uploadData.videoPath; // Hasil: /videos/{typeName}/{guideTitle}/{timestamp}.mp4
         }
 
+        // 2. Simpan Data Guide ke Database
         const payload = {
             groupId: parseInt(state.groupId, 10),
             title,
@@ -469,10 +480,14 @@ async function handleSaveGuide(e) {
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) throw new Error('Gagal menyimpan guide');
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Gagal menyimpan guide');
+        }
 
         closeGuideModal();
 
+        // 3. Refresh UI
         if (state.groupId) {
             await fetchGuidesByGroup(state.groupId);
         } else {

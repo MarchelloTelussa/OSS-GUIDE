@@ -216,7 +216,8 @@ async function fetchAndRenderGuideGroups(typeId) {
 }
 
 function renderGuideGroups(groups) {
-    elements.guideGroupContainer.innerHTML = `
+    // 1. Buat struktur HTML header + isi list/pesan kosong sekaligus
+    let contentHTML = `
         <div class="guideHeader">
             <h1>Guide</h1>
             <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
@@ -225,12 +226,17 @@ function renderGuideGroups(groups) {
         </div>
     `;
 
-    document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
-
     if (groups.length === 0) {
-        elements.guideGroupContainer.innerHTML += '<p style="margin-top:1rem;">No guides available in this group.</p>';
+        contentHTML += '<p style="margin-top:1rem;">No guides available in this group.</p>';
+        elements.guideGroupContainer.innerHTML = contentHTML;
+
+        // 2. Pasang event listener SETELAH innerHTML selesai diperbarui
+        document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
         return;
     }
+
+    // Render list jika data groups ada
+    elements.guideGroupContainer.innerHTML = contentHTML;
 
     groups.forEach((group) => {
         const groupCard = document.createElement('div');
@@ -244,6 +250,9 @@ function renderGuideGroups(groups) {
         groupCard.addEventListener('click', () => handleGuideGroupClick(group));
         elements.guideGroupContainer.appendChild(groupCard);
     });
+
+    // Pasang event listener untuk tombol manage
+    document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
 }
 
 // =============================================================

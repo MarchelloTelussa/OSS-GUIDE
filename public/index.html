@@ -21,21 +21,21 @@
         html, body { height: 100vh; margin: 0; overflow: hidden; }
         .fa, .fas, .far, .fab { border-radius: 0px !important; }
         .navContainer {top: 0; display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; padding: 0 1rem; min-height: 2.75rem;background-color: var(--main);}
-        .appName {color: white; font-weight: bold; font-size: 1.2rem;}
+        .appName {display: flex; flex-direction: row; align-items: end; color: white; font-weight: bold; font-size: 1.2rem;}
         .navAction {list-style-type: none; list-style: none; margin: 0; padding: 0; display: flex; gap: 0.8rem;}
         .navAction a {text-decoration: none; color: white; font-size: 1.2rem; font-weight: 500;}
 
         header {display: flex; flex-direction: row; align-items: flex-end; margin: 1.5rem 5rem 0; width: 100%; max-height: 5rem;}
-        .logoHeader { width: 3.5rem; height: 3.5rem; flex-shrink: 0; object-fit: contain;}
+        .logoHeader { width: 2rem; aspect-ratio: 1 / 1; flex-shrink: 0; object-fit: contain;}
         .pageName {color: var(--main); font-size: 4rem; margin: 0 0 -0.75rem 0.5rem; padding: 0;}
-        .searchContainer {display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; max-width: 40rem; height: 100%; max-height: 3rem; padding: 1rem 1rem; border-radius: 10px; border: 1px solid black; box-sizing: border-box; margin: 0 0 0 2.5rem}
-        .searchContainer input {flex: 1; border: none; outline: none; font-size: 1.2rem; background: transparent; width: 100%;}
-        .searchContainer button {width: auto; border: none; background-color: transparent; font-size: 2rem;}
+        .searchContainer { display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; height: 2.5rem; padding: 0.4rem 0.75rem; border-radius: 10px; border: 1px solid black; box-sizing: border-box; margin: 0; background-color: #fff; }
+        .searchContainer input { border: none; outline: none; width: 100%; background: transparent; }
+        .searchContainer button { border: none; background: transparent; cursor: pointer; padding: 0 0.25rem; }
         .searchContainer button:hover {cursor: pointer; color: var(--second);}
 
-        main {height: calc(100vh - 9.5rem); overflow: hidden; margin: 0.25rem 5rem 0; border: 1px solid black;}
+        main {height: calc(100vh - 3.5rem); overflow: hidden; margin: 0.25rem 5rem 0; border: 1px solid black;}
         .content {display: flex; flex-direction: column; height: 100%;}
-        .typeContainer {display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 2rem 0 0; width: 100%; height: 2.5rem; background-color: var(--main);}
+        .typeContainer  {display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 2rem 0 0; width: 100%; height: 2.5rem; background-color: var(--main);}
         .typeGroup {display:flex; flex-direction: row; width: auto; height: 100%;}
         .typeButton {display: flex; align-items: center; justify-content: center; padding: 0 1rem; height: 100%; cursor: pointer; transition: background-color 0.2s;}
         .typeButton:hover, .typeButton.active {background-color: var(--second);}
@@ -46,22 +46,36 @@
         .identityContainer {display: flex; flex-direction: row; width: 100%; height: calc(100% - 2.5rem); gap: 20px;}
 
         .typeIdentity { display: flex; flex-direction: column; width: 75%; height: 100%; padding: 1rem 2rem; background-color: var(--second2); overflow-y: auto; }
+        .typeIdentity.default-landing-center { display: flex; justify-content: center; align-items: center; width: 100%; text-align: center; padding: 2rem 1rem; }
+        
+        .default-landing-content { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .default-landing-content h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .default-landing-content p { line-height: 1.2; color: var(--text2, #555); margin: 0; }
+        .default-guide-img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 1rem; object-fit: contain; }
+   
         .typeIdentity.is-vertical { flex-direction: row; align-items: flex-start; gap: 2rem; }
-        .typeIdentity.is-vertical .typeDescription { width: 50%; }
-        .typeIdentity.is-vertical .typeImage { width: 50%; max-height: 80vh; }
-        .typeIdentity.is-vertical .typeImage img { width: auto; max-height: 75vh; object-fit: contain; }
+        .typeIdentity.is-vertical .typeDetail { width: 50%; margin-bottom: 0; }
+        .typeIdentity.is-vertical .typeImage { width: 50%; max-height: 75vh; }
+        .typeIdentity.is-vertical .typeImage img { width: 100%; height: auto; max-height: 75vh; object-fit: contain; }
+
+        .typeDetail { width: 100%; flex-shrink: 0; margin-bottom: 1rem; }
+        .typeDetail h1 { font-size: 2.5rem; margin: 0 0 0.5rem 0; text-transform: uppercase; color: var(--main); }
+        .typeDetail p { font-weight: bold; font-size: 1rem; text-align: justify; color: var(--text1); }
+        .typeImage { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; overflow: hidden; justify-content: center; align-items: center; }
+        .typeImage img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; object-position: center; display: block; }
 
         .typeDescription { width: 100%; flex-shrink: 0; margin-bottom: 1rem; }
         .typeDescription h1 { font-size: 2.5rem; margin: 0 0 0.5rem 0; text-transform: uppercase; color: var(--main); }
         .typeDescription p { font-weight: bold; font-size: 1rem; text-align: justify; color: var(--text1); }
         
-        .typeImage { display: flex; flex-direction: column; width: 100%; flex: 1; min-height: 0; overflow: hidden; }
-        .typeImage img { width: 100%; height: 100%; object-fit: contain; object-position: top left; }
+        
+        .guideGroupContainer { width: 25%; padding: 1rem; background-color: var(--second2); overflow-y: auto; box-sizing: border-box; }
+        .guideHeader { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }        .guideHeader h1 { margin: 0; font-size: 1.5rem; white-space: nowrap; }
+        .guideTitleRow { display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; }
+        .guideTitleRow h1 { margin: 0; font-size: 1.5rem; }
 
-        .guideGroupContainer {width: 25%; padding: 1rem; background-color: var(--second2); overflow-y: auto;}
-        .guideHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .guideHeader h1 { font-size: 2.5rem; margin: 0; color: var(--main); }
-        .btnManageGroup { background: none; border: none; color: var(--main); cursor: pointer; font-size: 1.2rem; }
+        
+        .btnManageGroup { background: none; border: none; color: var(--main); cursor: pointer; font-size: 1.2rem; padding: 0.25rem; }
         .btnManageGroup:hover { color: var(--second); }
 
         .guideGroup {display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; min-height: 3rem; border: 1px solid var(--outline); border-radius: 6px; padding: 0.5rem 1rem; margin-bottom: 0.5rem; cursor: pointer; background-color: white;}
@@ -89,16 +103,18 @@
         .editTypeForm label { font-weight: bold; color: var(--main); margin-bottom: 0.2rem; display: block; }
         .editTypeForm input, .editTypeForm textarea { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--outline); border-radius: 6px; font-size: 1rem; }
         .editTypeForm button.btnSave { background-color: var(--main); color: white; border: none; padding: 0.8rem; font-size: 1.1rem; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .default-guide-img { max-width: 100%; height: auto; border-radius: 8px; object-fit: contain; display: block; margin: 0 auto; }
 
         @media screen and (max-width: 1200px) { header { margin: 1.25rem 2rem 0; } main { margin: 0.25rem 2rem 0; } }
-        @media screen and (max-width: 992px) { .pageName { font-size: 3rem; margin: 0 0 -0.5rem 0.5rem; } .searchContainer { max-width: 100%; margin-left: 0; } .identityContainer { flex-direction: column; height: auto; overflow-y: auto; } .typeIdentity { width: 100%; height: auto; } .guideGroupContainer { width: 100%; height: auto; } }
-        @media screen and (max-width: 768px) { html, body { overflow-y: auto; } header { flex-direction: column; align-items: flex-start; max-height: none; margin: 1rem; width: calc(100% - 2rem); gap: 0.75rem; } header > div:first-child, header { display: flex; flex-wrap: wrap; } .logoHeader { width: 3rem; height: 3rem; } .pageName { font-size: 2.25rem; margin: 0 0 0 0.5rem; } .searchContainer { width: 100%; max-width: 100%; margin: 0; height: 3rem; box-sizing: border-box; } main { height: auto; margin: 0.5rem 1rem 1rem; overflow: visible; } .typeContainer { padding: 0 0.5rem; height: auto; min-height: 2.75rem; flex-direction: row; align-items: center; justify-content: space-between; gap: 0.5rem; } .typeGroup { flex: 1; overflow-x: auto; white-space: nowrap; display: flex; -webkit-overflow-scrolling: touch; } .typeButton { flex-shrink: 0; } .typeManageButton { flex-shrink: 0; } .typeModal { width: 95%; padding: 1.5rem 1rem; } }
-        @media screen and (max-width: 480px) { .appName { font-size: 1rem; } .navAction { gap: 0.5rem; } .typeIdentity { padding: 1rem; } .typeDescription h1 { font-size: 1.8rem; } .guideHeader h1 { font-size: 1.8rem; } }
+        @media screen and (max-width: 992px) { .pageName { font-size: 3rem; margin: 0 0 -0.5rem 0.5rem; } .searchContainer { width: 100%; max-width: 100%; margin: 0; } .identityContainer { flex-direction: column; height: auto; overflow-y: auto; } .typeIdentity { width: 100%; height: auto; } .guideGroupContainer { width: 100%; height: auto; } }
+        @media screen and (max-width: 768px) { html, body { overflow-y: auto; } header { flex-direction: column; align-items: flex-start; max-height: none; margin: 1rem; width: calc(100% - 2rem); gap: 0.75rem; } header > div:first-child, header { display: flex; flex-wrap: wrap; } .logoHeader { width: 2rem; height: 2rem; } .pageName { font-size: 2.25rem; margin: 0 0 0 0.5rem; } .searchContainer { width: 100%; max-width: 100%; margin: 0; height: 2.75rem; box-sizing: border-box; } main { height: auto; margin: 0.5rem 1rem 1rem; overflow: visible; } .typeContainer { padding: 0 0.5rem; height: auto; min-height: 2.75rem; flex-direction: row; align-items: center; justify-content: space-between; gap: 0.5rem; } .typeGroup { flex: 1; overflow-x: auto; white-space: nowrap; display: flex; -webkit-overflow-scrolling: touch; } .typeButton { flex-shrink: 0; } .typeManageButton { flex-shrink: 0; } .typeModal { width: 95%; padding: 1.5rem 1rem; } .guideTitleRow { width: 100%; display: flex; justify-content: space-between; align-items: center; } }
+        @media screen and (max-width: 480px) { .appName { font-size: 1rem; } .navAction { gap: 0.5rem; } .typeIdentity { padding: 1rem; } .typeDetail h1, .typeDescription h1 { font-size: 1.8rem; } .guideHeader h1 { font-size: 1.5rem; } .btnManageGroup { font-size: 1.1rem; } }
     </style>
 </head>
 <body>
     <nav class="navContainer">
         <div class="appName">
+            <img class="logoHeader" src="./img/logo.png" alt="Logo">
             <h3>QUANTUM GUIDE</h3>
         </div>
         <ul class="navAction">
@@ -107,14 +123,6 @@
             <li><a href="#" id="fullscreen"><i class="fa-solid fa-maximize"></i></a></li>
         </ul>
     </nav>
-    <header>
-        <img class="logoHeader" src="./img/logo.png" alt="Logo">
-        <h1 class="pageName">DASHBOARD</h1>
-        <div class="searchContainer">
-            <input id="searchBar" type="text" placeholder="Cari guide...">
-            <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
-        </div>
-    </header>
     <main>
         <div class="content">
             <div class="typeContainer">
@@ -130,7 +138,8 @@
                     </div>
                     <div class="typeImage"></div>
                 </div>
-                <div id="guideGroup" class="guideGroupContainer"></div>
+                <div id="guideGroup" class="guideGroupContainer">
+                </div>
             </div>
         </div>
     </main>

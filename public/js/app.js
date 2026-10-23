@@ -231,6 +231,61 @@ function setupEventListeners() {
 }
 
 /**
+ * Render Tampilan Default (Welcome Screen QuantumGuide)
+ */
+function renderDefaultView() {
+    state.selectedTypeId = null;
+    
+    renderTypeTabs();
+
+    if (elements.typeIdentityContainer) {
+        elements.typeIdentityContainer.className = 'typeIdentity default-landing-center';
+        elements.typeIdentityContainer.innerHTML = `
+            <div class="default-landing-content">
+                <h1>Quantum Guide</h1>
+                <p>
+                    Selamat datang di <strong>QuantumGuide</strong>, pusat dokumentasi dan panduan resmi untuk seluruh ekosistem aplikasi PT Quantum Nusatama. 
+                    Platform ini menyediakan panduan langkah demi langkah, serta dokumentasi video untuk membantu Anda mengoperasikan berbagai aplikasi perusahaan secara efisien.
+                </p>
+                <p>
+                    Silakan pilih jenis modul atau aplikasi pada menu di atas untuk mulai menjelajahi panduan penggunaan.
+                </p>
+                <img src="./img/dashboard.png" alt="QuantumGuide Illustration" class="default-guide-img">
+            </div>
+        `;
+    }
+
+    if (elements.guideGroupContainer) {
+        elements.guideGroupContainer.innerHTML = '';
+        elements.guideGroupContainer.style.display = 'none';
+    }
+}
+
+/**
+ * Restore Elemen DOM Asli di typeIdentityContainer saat Type dipilih
+ */
+function restoreTypeIdentityDOM() {
+    if (!elements.typeIdentityContainer) return;
+
+    // Kembalikan class bawaan
+    elements.typeIdentityContainer.className = 'typeIdentity';
+
+    // Restorasi struktur HTML internal untuk type
+    elements.typeIdentityContainer.innerHTML = `
+        <div class="typeDetail">
+            <div id="typeName"></div>
+            <div id="typeDesc"></div>
+        </div>
+        <div class="typeImage"></div>
+    `;
+
+    // Re-cache elemen-elemen anak agar reference di objek `elements` tetap valid
+    elements.typeName = document.getElementById('typeName');
+    elements.typeDesc = document.getElementById('typeDesc');
+    elements.typeImageContainer = document.querySelector('.typeImage');
+}
+
+/**
  * Fetch All Types
  */
 async function fetchAndRenderTypes() {
@@ -247,11 +302,9 @@ async function fetchAndRenderTypes() {
 
         renderTypeTabs();
         
-        if (!state.selectedTypeId && state.types.length > 0) {
-            selectType(state.types[0].id);
-        } else {
-            renderTypeTabs();
-        }
+        // Panggil tampilan default saat pertama kali load / refresh
+        renderDefaultView();
+
     } catch (error) {
         console.error('Error fetching types:', error);
         elements.typesContainer.innerHTML = '<div class="typeButton"><h1>Error Loading</h1></div>';
@@ -269,6 +322,10 @@ function renderTypeTabs() {
 
         typeTab.addEventListener('click', () => {
             if (state.selectedTypeId !== type.id) {
+                // Tampilkan kembali guideGroupContainer ketika type dipilih
+                if (elements.guideGroupContainer) {
+                    elements.guideGroupContainer.style.display = '';
+                }
                 selectType(type.id);
             }
         });
@@ -277,9 +334,20 @@ function renderTypeTabs() {
     });
 }
 
+/**
+ * Select Type (Updated)
+ */
 async function selectType(typeId) {
     state.selectedTypeId = typeId;
     renderTypeTabs();
+
+    // Tampilkan kembali guideGroupContainer
+    if (elements.guideGroupContainer) {
+        elements.guideGroupContainer.style.display = '';
+    }
+
+    // Kembalikan struktur DOM asli sebelum merender data type
+    restoreTypeIdentityDOM();
 
     try {
         const response = await fetch(`${API_BASE}/types/${typeId}`);
@@ -345,8 +413,10 @@ async function fetchAndRenderGuideGroups(typeId) {
 function renderGuideGroups(groups) {
     const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
 
+    // 1. Masukkan searchContainer ke dalam guideHeader
     let contentHTML = `
         <div class="guideHeader">
+        <div class="guideTitleRow">
             <h1>Guide</h1>
             ${isAdmin ? `
                 <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
@@ -354,30 +424,59 @@ function renderGuideGroups(groups) {
                 </button>
             ` : ''}
         </div>
+        <div class="searchContainer">
+            <input id="searchBar" type="text" placeholder="Cari guide...">
+            <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+    </div>
+    <div id="groupListContainer"></div>
     `;
-
-    if (groups.length === 0) {
-        contentHTML += '<p style="margin-top:1rem;">No guides available in this group.</p>';
-        elements.guideGroupContainer.innerHTML = contentHTML;
-        if (isAdmin) document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
-        return;
-    }
 
     elements.guideGroupContainer.innerHTML = contentHTML;
 
-    groups.forEach((group) => {
-        const groupCard = document.createElement('div');
-        groupCard.className = 'guideGroup';
-        groupCard.innerHTML = `
-            <h1>${escapeHTML(group.title)}</h1>
-            <i class="fa-solid fa-angle-right fa-xl"></i>
-        `;
+    // Element penampung daftar card grup
+    const listContainer = document.getElementById('groupListContainer');
 
-        groupCard.addEventListener('click', () => handleGuideGroupClick(group));
-        elements.guideGroupContainer.appendChild(groupCard);
-    });
+    // Function internal untuk render card list
+    function renderList(filteredGroups) {
+        listContainer.innerHTML = '';
 
-    if (isAdmin) document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
+        if (filteredGroups.length === 0) {
+            listContainer.innerHTML = '<p style="margin-top:1rem;">No guides found.</p>';
+            return;
+        }
+
+        filteredGroups.forEach((group) => {
+            const groupCard = document.createElement('div');
+            groupCard.className = 'guideGroup';
+            groupCard.innerHTML = `
+                <h1>${escapeHTML(group.title)}</h1>
+            `;
+
+            groupCard.addEventListener('click', () => handleGuideGroupClick(group));
+            listContainer.appendChild(groupCard);
+        });
+    }
+
+    // Render awal seluruh grup
+    renderList(groups);
+
+    // 2. Tambahkan event listener untuk pencarian
+    const searchBar = document.getElementById('searchBar');
+    const searchBtn = document.getElementById('searchBtn');
+
+    function filterGroups() {
+        const query = searchBar.value.toLowerCase().trim();
+        const filtered = groups.filter(group => group.title.toLowerCase().includes(query));
+        renderList(filtered);
+    }
+
+    searchBar?.addEventListener('input', filterGroups);
+    searchBtn?.addEventListener('click', filterGroups);
+
+    if (isAdmin) {
+        document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
+    }
 }
 
 // =============================================================

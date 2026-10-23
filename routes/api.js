@@ -404,6 +404,35 @@ router.get('/groups/:id', async (req, res, next) => {
     }
 });
 
+// PUT update group
+router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    const { typeId, title, description, groupOrder } = req.body;
+
+    if (!typeId) {
+        return res.status(400).json({ error: 'typeId wajib diisi.' });
+    }
+
+    try {
+        const queryText = `
+            UPDATE guide_groups
+            SET type_id = $1, title = $2, description = $3, group_order = $4
+            WHERE id = $5
+            RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
+        `;
+        const { rows } = await db.query(queryText, [typeId, title, description || '', groupOrder || 0, id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Guide Group tidak ditemukan.' });
+        }
+
+        res.json(rows[0]);
+    } catch (error) {
+        // Tangani error DB dan kembalikan JSON
+        res.status(500).json({ error: error.message || 'Terjadi kesalahan pada server.' });
+    }
+});
+
 // POST create guide group (ITAdmin only)
 router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
@@ -431,80 +460,6 @@ router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// PUT update guide (ITAdmin only)
-router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
-    const { id } = req.params;
-    const guideId = parseInt(id, 10);
-
-    if (isNaN(guideId)) {
-        return res.status(400).json({ error: 'Invalid ID' });
-    }
-
-    const client = await db.getClient();
-    try {
-        const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
-
-        if (!groupId || !title || !functionDesc) {
-            return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
-        }
-
-        await client.query('BEGIN');
-
-        // 1. Ambil data video_url lama dari database sebelum di-update
-        const oldGuideRes = await client.query('SELECT video_url FROM guide WHERE id = $1', [guideId]);
-        if (oldGuideRes.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Guide tidak ditemukan' });
-        }
-        const oldVideoUrl = oldGuideRes.rows[0].video_url;
-
-        // 2. Update data guide di database
-        const updateGuideQuery = `
-            UPDATE guide
-            SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5
-            WHERE id = $6
-            RETURNING id;
-        `;
-        const { rows } = await client.query(updateGuideQuery, [
-            groupId,
-            title.trim(),
-            functionDesc,
-            importantNote || '',
-            videoUrl || '',
-            guideId
-        ]);
-
-        // 3. Replace steps
-        await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
-
-        if (Array.isArray(steps) && steps.length > 0) {
-            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
-            for (let i = 0; i < cleanSteps.length; i++) {
-                await client.query(
-                    `INSERT INTO guide_steps (guide_id, step_order, step_description)
-                     VALUES ($1, $2, $3);`,
-                    [guideId, i + 1, cleanSteps[i]]
-                );
-            }
-        }
-
-        await client.query('COMMIT');
-
-        // 4. PEMBERSIHAN: Jika ada video baru dan videoUrl lama berbeda, hapus video lama dari server
-        if (oldVideoUrl && videoUrl && oldVideoUrl !== videoUrl) {
-            cleanupFileAndParentDir(oldVideoUrl);
-        }
-
-        res.json({ message: 'Guide updated successfully', id: guideId });
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        next(error);
-    } finally {
-        client.release();
-    }
-});
-
 // DELETE guide group (ITAdmin only)
 router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
@@ -525,6 +480,7 @@ router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         next(error);
     }
 });
+
 
 // =============================================================
 // 3. GUIDE ROUTES (CRUD)
@@ -672,7 +628,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// PUT update guide (ITAdmin only)
+// PUT update guide (ITAdmin only) g
 router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
@@ -691,6 +647,15 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('BEGIN');
 
+        // 1. Ambil data video_url lama dari database sebelum di-update
+        const oldGuideRes = await client.query('SELECT video_url FROM guide WHERE id = $1', [guideId]);
+        if (oldGuideRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Guide tidak ditemukan' });
+        }
+        const oldVideoUrl = oldGuideRes.rows[0].video_url;
+
+        // 2. Update data guide di database
         const updateGuideQuery = `
             UPDATE guide
             SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5
@@ -706,12 +671,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             guideId
         ]);
 
-        if (rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Guide not found' });
-        }
-
-        // Replace steps
+        // 3. Replace steps
         await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
 
         if (Array.isArray(steps) && steps.length > 0) {
@@ -726,6 +686,11 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         }
 
         await client.query('COMMIT');
+
+        // 4. PEMBERSIHAN: Jika ada video baru dan videoUrl lama berbeda, hapus video lama dari server
+        if (oldVideoUrl && videoUrl && oldVideoUrl !== videoUrl) {
+            cleanupFileAndParentDir(oldVideoUrl);
+        }
 
         res.json({ message: 'Guide updated successfully', id: guideId });
 

@@ -234,6 +234,14 @@ function setupEventListeners() {
             if (e.key === 'Enter') handleCreateType();
         });
     }
+
+    // --- TAMBAHAN: Listener saat dropdown parent di modal manage type berubah ---
+    if (elements.newTypeParentSelect) {
+        elements.newTypeParentSelect.addEventListener('change', () => {
+            renderManageTypeList();
+        });
+    }
+
     if (elements.editTypeForm) elements.editTypeForm.addEventListener('submit', handleUpdateType);
 
     if (elements.closeManageGroupModal) elements.closeManageGroupModal.addEventListener('click', closeAllModals);
@@ -547,12 +555,18 @@ function renderManageTypeList() {
     if (!elements.typeListManage) return;
     elements.typeListManage.innerHTML = '';
 
-    if (state.types.length === 0) {
-        elements.typeListManage.innerHTML = '<p style="text-align:center;">Belum ada type.</p>';
+    // Ambil parentSlug yang sedang dipilih di dropdown (misal: 'web' atau 'mobile')
+    const selectedParentSlug = elements.newTypeParentSelect ? elements.newTypeParentSelect.value : 'web';
+
+    // Filter type berdasarkan parentSlug yang aktif
+    const filteredTypes = state.types.filter(type => type.parentSlug === selectedParentSlug);
+
+    if (filteredTypes.length === 0) {
+        elements.typeListManage.innerHTML = `<p style="text-align:center;">Belum ada type untuk parent "${escapeHTML(selectedParentSlug)}".</p>`;
         return;
     }
 
-    state.types.forEach((type) => {
+    filteredTypes.forEach((type) => {
         const item = document.createElement('div');
         item.className = 'manageTypeItem';
         item.innerHTML = `
@@ -778,6 +792,12 @@ function renderManageGroupList() {
 
 async function handleCreateGroup() {
     const title = elements.newGroupTitleInput.value.trim();
+
+    if (!state.selectedTypeId) {
+        alert('Pilih Type terlebih dahulu sebelum menambahkan group!');
+        return;
+    }
+
     if (!title) {
         alert('Judul Guide Group tidak boleh kosong!');
         return;
@@ -795,7 +815,10 @@ async function handleCreateGroup() {
             })
         });
 
-        if (!response.ok) throw new Error('Gagal menambah Guide Group');
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Gagal menambah Guide Group');
+        }
 
         elements.newGroupTitleInput.value = '';
         await fetchAndRenderGuideGroups(state.selectedTypeId);
@@ -803,7 +826,7 @@ async function handleCreateGroup() {
 
     } catch (error) {
         console.error('Error creating group:', error);
-        alert('Gagal membuat guide group.');
+        alert(error.message || 'Gagal membuat guide group.');
     }
 }
 
@@ -812,6 +835,10 @@ function openEditGroupModal(group) {
     elements.editGroupTitle.value = group.title;
     elements.editGroupDesc.value = group.description || '';
     elements.editGroupOrder.value = group.groupOrder || 0;
+
+    if (elements.editGroupForm) {
+        elements.editGroupForm.dataset.typeId = group.typeId || group.type_id || state.selectedTypeId;
+    }
 
     elements.manageGroupModal.classList.remove('active');
     elements.editGroupModal.classList.add('active');
@@ -825,26 +852,47 @@ async function handleUpdateGroup(e) {
     const description = elements.editGroupDesc.value.trim();
     const groupOrder = parseInt(elements.editGroupOrder.value, 10) || 0;
 
+    // Ambil typeId dari dataset modal, jika tidak ada baru gunakan state.selectedTypeId
+    const targetTypeId = elements.editGroupForm?.dataset?.typeId || state.selectedTypeId;
+
+    if (!targetTypeId) {
+        alert('Gagal memperbarui: Type ID tidak ditemukan.');
+        return;
+    }
+
     try {
         const response = await fetch(`${API_BASE}/groups/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                typeId: state.selectedTypeId,
+                typeId: parseInt(targetTypeId, 10),
                 title,
                 description,
                 groupOrder
             })
         });
 
-        if (!response.ok) throw new Error('Gagal memperbarui Guide Group');
+        // Ambil text mentah terlebih dahulu untuk mencegah error JSON.parse jika server merespons HTML
+        const responseText = await response.text();
+        let responseData;
+        try {
+            responseData = JSON.parse(responseText);
+        } catch (parseErr) {
+            throw new Error(`Server Error (${response.status}): Respons bukan format JSON.`);
+        }
+
+        if (!response.ok) {
+            throw new Error(responseData.error || 'Gagal memperbarui Guide Group');
+        }
 
         closeAllModals();
-        await fetchAndRenderGuideGroups(state.selectedTypeId);
+
+        // Refresh daftar group dari typeId yang valid
+        await fetchAndRenderGuideGroups(targetTypeId);
 
     } catch (error) {
         console.error('Error updating group:', error);
-        alert('Gagal mengupdate guide group.');
+        alert(error.message || 'Gagal mengupdate guide group.');
     }
 }
 

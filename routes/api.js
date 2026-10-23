@@ -78,11 +78,11 @@ function cleanupFileAndParentDir(relPath) {
 // 1. TYPE ROUTES (CRUD)
 // =============================================================
 
-// GET all types
+// GET all types (termasuk field parent_slug / parentSlug)
 router.get('/types', async (req, res, next) => {
     try {
         const queryText = `
-            SELECT id, title, description, image_url AS "imgUrl", created_at, updated_at
+            SELECT id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl", created_at, updated_at
             FROM type
             ORDER BY id ASC;
         `;
@@ -93,13 +93,14 @@ router.get('/types', async (req, res, next) => {
     }
 });
 
-// GET single type by ID (including nested groups)
+// GET single type by ID (termasuk parentSlug & nested groups)
 router.get('/types/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
         const queryText = `
             SELECT 
                 t.id, 
+                t.parent_slug AS "parentSlug",
                 t.title, 
                 t.description, 
                 t.image_url AS "imgUrl",
@@ -130,21 +131,22 @@ router.get('/types/:id', async (req, res, next) => {
 });
 
 // POST create type (ITAdmin only)
-// POST create type
 router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
-        const { title, description, imgUrl } = req.body;
+        const { parentSlug, title, description, imgUrl } = req.body;
+        
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'Title field is required' });
         }
 
         const trimmedTitle = title.trim();
+        const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
 
+        // Cek Duplikasi Nama Type
         const checkDuplicate = await db.query(
             `SELECT id FROM type 
-            WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
-            ${id ? 'AND id != $2' : ''}`,
-            id ? [newTitle, id] : [trimmedTitle]
+            WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '')`,
+            [trimmedTitle]
         );
 
         if (checkDuplicate.rows.length > 0) {
@@ -152,11 +154,12 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
         }
 
         const queryText = `
-            INSERT INTO type (title, description, image_url)
-            VALUES ($1, $2, $3)
-            RETURNING id, title, description, image_url AS "imgUrl";
+            INSERT INTO type (parent_slug, title, description, image_url)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl";
         `;
         const { rows } = await db.query(queryText, [
+            validParentSlug,
             trimmedTitle, 
             description || '', 
             imgUrl || ''
@@ -168,23 +171,24 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// PUT update type (ITAdmin only)
 // PUT update type (ITAdmin only + Auto-Rename Folder & Path Sync)
 router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
-    const { title, description, imgUrl } = req.body;
+    const { parentSlug, title, description, imgUrl } = req.body;
 
     if (!title || !title.trim()) {
         return res.status(400).json({ error: 'Title field is required' });
     }
 
     const newTitle = title.trim();
+    const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
 
+    // Cek Duplikasi Nama Type (abaikan ID yang sedang di-edit)
     const checkDuplicate = await db.query(
         `SELECT id FROM type 
         WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
-        ${id ? 'AND id != $2' : ''}`,
-        id ? [newTitle, id] : [trimmedTitle]
+        AND id != $2`,
+        [newTitle, id]
     );
 
     if (checkDuplicate.rows.length > 0) {
@@ -203,7 +207,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         }
 
         const oldTitle = oldTypeRes.rows[0].title;
-        const newTitle = title.trim();
 
         // 2. Sanitasi nama folder lama dan baru
         const oldSafeFolder = oldTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
@@ -262,11 +265,12 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         // 4. Update tabel Type di Database
         const updateTypeQuery = `
             UPDATE type
-            SET title = $1, description = $2, image_url = $3
-            WHERE id = $4
-            RETURNING id, title, description, image_url AS "imgUrl";
+            SET parent_slug = $1, title = $2, description = $3, image_url = $4
+            WHERE id = $5
+            RETURNING id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl";
         `;
         const { rows } = await client.query(updateTypeQuery, [
+            validParentSlug,
             newTitle, 
             description || '', 
             finalImgUrl, 
@@ -275,7 +279,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('COMMIT');
 
-        // Verifikasi langkah: Pastikan respons mengembalikan data Type yang telah diubah
         res.json(rows[0]);
 
     } catch (error) {
@@ -290,7 +293,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     try {
-        // Ambil info title dan img_url untuk pembersihan berkas
         const typeRes = await db.query('SELECT title, image_url FROM type WHERE id = $1', [id]);
         if (typeRes.rows.length === 0) {
             return res.status(404).json({ error: 'Type not found' });
@@ -298,7 +300,6 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         const { title, image_url } = typeRes.rows[0];
 
-        // Ambil semua video_url guide di bawah Type ini
         const videosRes = await db.query(`
             SELECT g.video_url 
             FROM guide g 
@@ -306,18 +307,14 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             WHERE gg.type_id = $1
         `, [id]);
 
-        // Hapus rekord Type dari DB (Cascade)
         await db.query('DELETE FROM type WHERE id = $1', [id]);
 
-        // Bersihkan gambar fisik type
         if (image_url) cleanupFileAndParentDir(image_url);
 
-        // Bersihkan seluruh video fisik di bawah type ini
         videosRes.rows.forEach(row => {
             if (row.video_url) cleanupFileAndParentDir(row.video_url);
         });
 
-        // Hapus folder fisik type jika ada
         const safeTypeFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
         const imgTypeDir = path.join(__dirname, '../public/img', safeTypeFolder);
         const videoTypeDir = path.join(__dirname, '../public/videos', safeTypeFolder);

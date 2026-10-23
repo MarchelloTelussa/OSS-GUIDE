@@ -1,5 +1,9 @@
 // State Management
 const state = {
+    typeParents: [
+        { slug: 'web', title: 'Web' },
+        { slug: 'mobile', title: 'Mobile' }
+    ],
     types: [],
     selectedTypeId: null,
     groups: [],
@@ -67,6 +71,10 @@ function injectAdminDOM() {
                     <button id="closeManageModal" class="closeModalBtn">&times;</button>
                 </div>
                 <div class="addTypeForm">
+                    <select id="newTypeParentSelect" class="selectParent">
+                        <option value="web">Web</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
                     <input type="text" id="newTypeTitleInput" placeholder="Masukkan judul type baru...">
                     <button id="btnSubmitAddType" title="Tambah Type"><i class="fa-solid fa-plus"></i></button>
                 </div>
@@ -88,6 +96,13 @@ function injectAdminDOM() {
                     <div>
                         <label>Description</label>
                         <textarea id="editTypeDesc" rows="3" placeholder="Masukkan deskripsi..."></textarea>
+                    </div>
+                    <div>
+                        <label>Parent Application</label>
+                        <select id="editTypeParentSelect" class="selectParentInput">
+                            <option value="web">Web</option>
+                            <option value="mobile">Mobile</option>
+                        </select>
                     </div>
                     <div>
                         <label>Upload Gambar / Screenshot Flow</label>
@@ -161,6 +176,7 @@ function cacheDOMElements() {
         newTypeTitleInput: document.getElementById('newTypeTitleInput'),
         btnSubmitAddType: document.getElementById('btnSubmitAddType'),
         typeListManage: document.getElementById('typeListManage'),
+        newTypeParentSelect: document.getElementById('newTypeParentSelect'),
 
         editTypeModal: document.getElementById('editTypeModal'),
         closeEditModal: document.getElementById('closeEditModal'),
@@ -170,6 +186,7 @@ function cacheDOMElements() {
         editTypeDesc: document.getElementById('editTypeDesc'),
         editTypeImageInput: document.getElementById('editTypeImageInput'),
         currentImgUrlPath: document.getElementById('currentImgUrlPath'),
+        editTypeParentSelect: document.getElementById('editTypeParentSelect'),
 
         manageGroupModal: document.getElementById('manageGroupModal'),
         closeManageGroupModal: document.getElementById('closeManageGroupModal'),
@@ -296,7 +313,11 @@ async function fetchAndRenderTypes() {
         state.types = await response.json();
         
         if (state.types.length === 0) {
-            elements.typesContainer.innerHTML = '<div class="typeButton"><h1>No Types</h1></div>';
+            elements.typesContainer.innerHTML = `
+                <div class="typeGroup">
+                    <div class="dropdownBtn disabled"><span>No Types Available</span></div>
+                </div>
+            `;
             return;
         }
 
@@ -307,30 +328,55 @@ async function fetchAndRenderTypes() {
 
     } catch (error) {
         console.error('Error fetching types:', error);
-        elements.typesContainer.innerHTML = '<div class="typeButton"><h1>Error Loading</h1></div>';
+        elements.typesContainer.innerHTML = `
+            <div class="typeGroup">
+                <div class="dropdownBtn disabled"><span>Error Loading Types</span></div>
+            </div>
+        `;
     }
 }
 
 function renderTypeTabs() {
+    // 1. Langsung bersihkan isi dari elements.typesContainer (id="types")
     elements.typesContainer.innerHTML = '';
 
-    state.types.forEach((type) => {
-        const typeTab = document.createElement('div');
-        const isActive = type.id === state.selectedTypeId;
-        typeTab.className = `typeButton ${isActive ? 'active' : ''}`;
-        typeTab.innerHTML = `<h1>${escapeHTML(type.title)}</h1>`;
+    // 2. Render masing-masing parent dropdown langsung ke typesContainer
+    state.typeParents.forEach(parent => {
+        const dropdown = document.createElement('div');
+        dropdown.className = 'typeDropdown';
 
-        typeTab.addEventListener('click', () => {
-            if (state.selectedTypeId !== type.id) {
-                // Tampilkan kembali guideGroupContainer ketika type dipilih
-                if (elements.guideGroupContainer) {
-                    elements.guideGroupContainer.style.display = '';
+        const parentTypes = state.types.filter(t => t.parentSlug === parent.slug);
+        const isParentActive = parentTypes.some(t => t.id === state.selectedTypeId);
+
+        dropdown.innerHTML = `
+            <button class="dropdownBtn ${isParentActive ? 'active' : ''}">
+                <span>${escapeHTML(parent.title)}</span>
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
+            <div class="dropdownMenu">
+                ${parentTypes.length > 0 
+                    ? parentTypes.map(type => `
+                        <div class="dropdownItem ${type.id === state.selectedTypeId ? 'active' : ''}" data-id="${type.id}">
+                            ${escapeHTML(type.title)}
+                        </div>
+                    `).join('') 
+                    : '<div class="dropdownItem disabled">Belum ada type</div>'
                 }
-                selectType(type.id);
-            }
+            </div>
+        `;
+
+        // Event listener untuk klik item type
+        dropdown.querySelectorAll('.dropdownItem[data-id]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const typeId = parseInt(e.target.dataset.id, 10);
+                if (state.selectedTypeId !== typeId) {
+                    selectType(typeId);
+                }
+            });
         });
 
-        elements.typesContainer.appendChild(typeTab);
+        // Masukkan dropdown langsung ke #types tanpa pembungkus typeGroup baru
+        elements.typesContainer.appendChild(dropdown);
     });
 }
 
@@ -420,7 +466,7 @@ function renderGuideGroups(groups) {
             <h1>Guide</h1>
             ${isAdmin ? `
                 <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
-                    <i class="fa-solid fa-folder-plus"></i>
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
                 </button>
             ` : ''}
         </div>
@@ -525,8 +571,9 @@ function renderManageTypeList() {
 }
 
 async function handleCreateType() {
+    const parentSlug = elements.newTypeParentSelect.value;
     const title = elements.newTypeTitleInput.value.trim();
-    
+
     if (!title) {
         alert('Judul Type tidak boleh kosong!');
         return;
@@ -549,6 +596,7 @@ async function handleCreateType() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                parentSlug: parentSlug,
                 title: title,
                 description: "",
                 imgUrl: ""
@@ -576,6 +624,11 @@ function openEditTypeModal(type) {
     elements.editTypeTitle.dataset.originalTitle = type.title;
     elements.editTypeDesc.value = type.description || '';
     
+    // ISIKAN VALUE SELECT DENGAN parentSlug MILIK TYPE:
+    if (elements.editTypeParentSelect) {
+        elements.editTypeParentSelect.value = type.parentSlug || 'web';
+    }
+
     currentExistingImgUrl = type.imgUrl || '';
     if (elements.currentImgUrlPath) {
         elements.currentImgUrlPath.innerText = currentExistingImgUrl 
@@ -596,7 +649,8 @@ async function handleUpdateType(e) {
     const title = elements.editTypeTitle.value.trim();
     const description = elements.editTypeDesc.value.trim();
     const imageFile = elements.editTypeImageInput?.files ? elements.editTypeImageInput.files[0] : null;
-
+    const parentSlug = elements.editTypeParentSelect ? elements.editTypeParentSelect.value : 'web';
+    
     if (!title) {
         alert('Judul Type tidak boleh kosong!');
         return;
@@ -640,7 +694,12 @@ async function handleUpdateType(e) {
         const response = await fetch(`${API_BASE}/types/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description, imgUrl: finalImgUrl })
+            body: JSON.stringify({ 
+                parentSlug, // <-- Kirim parentSlug ke backend
+                title, 
+                description, 
+                imgUrl: finalImgUrl 
+            })
         });
 
         if (!response.ok) {

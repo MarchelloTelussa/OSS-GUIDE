@@ -17,7 +17,8 @@
             --second : rgb(3, 0, 151);
             --second2 : rgb(250, 250, 250); 
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Arimo";}
+        * { margin: 0; padding: 0; box-sizing: border-box;}
+        *:not(i):not([class*="fa-"]):not([class*="fa"]) { font-family: "Arimo", sans-serif !important; }
         html, body { height: 100vh; margin: 0; overflow: hidden; }
         .fa, .fas, .far, .fab { border-radius: 0px !important; }
         .navContainer {top: 0; display: flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; padding: 0 1rem; min-height: 2.75rem;background-color: var(--main);}
@@ -113,7 +114,6 @@
         .editTypeForm label { font-weight: bold; color: var(--main); margin-bottom: 0.2rem; display: block; }
         .editTypeForm input, .editTypeForm textarea { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--outline); border-radius: 6px; font-size: 1rem; }
         .editTypeForm button.btnSave { background-color: var(--main); color: white; border: none; padding: 0.8rem; font-size: 1.1rem; font-weight: bold; border-radius: 6px; cursor: pointer; }
-        .default-guide-img { max-width: 100%; height: auto; border-radius: 8px; object-fit: contain; display: block; margin: 0 auto; }
 
         @media screen and (max-width: 1200px) { header { margin: 1.25rem 2rem 0; } main { margin: 0.25rem 2rem 0; } }
         @media screen and (max-width: 992px) { .pageName { font-size: 3rem; margin: 0 0 -0.5rem 0.5rem; } .searchContainer { width: 100%; max-width: 100%; margin: 0; } .identityContainer { flex-direction: column; height: auto; overflow-y: auto; } .typeIdentity { width: 100%; height: auto; } .guideGroupContainer { width: 100%; height: auto; } }

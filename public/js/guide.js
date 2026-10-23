@@ -188,7 +188,6 @@ function renderListView() {
 
     viewContainer.innerHTML = `
         <header class="dashboardHeader">
-            <img class="logoHeader" src="./img/logo.png" alt="Logo">
             <h1 class="pageName">GUIDE</h1>
             <div class="searchContainer">
                 <input id="searchBar" type="text" placeholder="Cari guide..." value="${escapeHTML(state.searchQuery)}">

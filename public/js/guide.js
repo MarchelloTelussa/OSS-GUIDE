@@ -1,6 +1,8 @@
 // State Management
 const state = {
     groupId: null,
+    group: null,       // Object metadata Group (misal: { id, name, typeId })
+    type: null,        // Object metadata Type (misal: { id, name })
     guides: [],
     currentGuide: null,
     searchQuery: '',
@@ -34,12 +36,37 @@ async function init() {
     state.groupId = urlParams.get('groupId');
 
     if (state.groupId) {
-        await fetchGuidesByGroup(state.groupId);
+        await fetchGroupDetails(state.groupId);
     } else {
         await fetchAllGuides();
     }
 
     renderListView();
+}
+
+/**
+ * Fetch Detail Metadata Group, Type, sekaligus Daftar Guides
+ */
+async function fetchGroupDetails(groupId) {
+    try {
+        const response = await fetch(`${API_BASE}/groups/${groupId}`);
+        if (!response.ok) throw new Error('Gagal memuat detail group');
+        
+        const groupData = await response.json();
+        
+        state.group = groupData;
+        state.type = groupData.type; // Berisi { id, name } dari JOIN backend
+        
+        // Mengisi state.guides dari array nested 'guides' dari backend
+        if (Array.isArray(groupData.guides)) {
+            state.guides = groupData.guides;
+        }
+    } catch (error) {
+        console.error('Error fetching group details:', error);
+        state.group = null;
+        state.type = null;
+        state.guides = [];
+    }
 }
 
 /**
@@ -108,7 +135,6 @@ function injectGuideAdminModal() {
         </div>
     `;
 
-    // Cache referensi elemen yang baru di-inject
     guideModal = document.getElementById('guideModal');
     guideModalTitle = document.getElementById('guideModalTitle');
     guideForm = document.getElementById('guideForm');
@@ -186,9 +212,13 @@ function renderListView() {
         (g.functionDesc && g.functionDesc.toLowerCase().includes(state.searchQuery.toLowerCase()))
     );
 
+    // Menentukan nama Type dan Nama Group secara dinamis
+    const typeName = state.type?.name ? state.type.name.toUpperCase() : 'GUIDE';
+    const groupName = state.group?.title ? state.group.title.toUpperCase() : 'GUIDE LIST';
+
     viewContainer.innerHTML = `
         <header class="dashboardHeader">
-            <h1 class="pageName">GUIDE</h1>
+            <h1 class="pageName">${escapeHTML(typeName)}</h1>
             <div class="searchContainer">
                 <input id="searchBar" type="text" placeholder="Cari guide..." value="${escapeHTML(state.searchQuery)}">
                 <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -199,7 +229,7 @@ function renderListView() {
                 <div class="typeContainer">
                     <div class="typeGroup">
                         <div class="typeButton active">
-                            <h1>GUIDE LIST</h1>
+                            <h1>${escapeHTML(groupName)}</h1>
                         </div>
                     </div>
                     <div class="buttonGroup">
@@ -418,19 +448,16 @@ async function handleSaveGuide(e) {
     const importantNote = guideNoteInput.value.trim();
     const videoFile = guideVideoInput.files[0];
 
-    // Array steps yang sudah dibersihkan dari string kosong
     const stepInputs = document.querySelectorAll('.stepInput');
     const steps = Array.from(stepInputs)
         .map(input => input.value.trim())
         .filter(val => val !== '');
 
-    // Validasi video wajib ada (baik file baru maupun videoUrl lama saat edit)
     if (!videoFile && !state.existingVideoUrl) {
         alert('Harap pilih file video untuk guide ini.');
         return;
     }
 
-    // Validasi groupId wajib ada
     if (!state.groupId) {
         alert('Group ID tidak valid. Silakan pilih Guide Group terlebih dahulu.');
         return;
@@ -439,12 +466,11 @@ async function handleSaveGuide(e) {
     let videoUrl = state.existingVideoUrl;
 
     try {
-        // 1. Upload Video Baru jika Pengguna Memilih File
         if (videoFile) {
             const formData = new FormData();
             formData.append('video', videoFile);
             formData.append('title', title);
-            formData.append('groupId', state.groupId); // Mengirim groupId ke backend
+            formData.append('groupId', state.groupId);
 
             const uploadRes = await fetch(`${API_BASE}/upload-video`, {
                 method: 'POST',
@@ -457,10 +483,9 @@ async function handleSaveGuide(e) {
             }
 
             const uploadData = await uploadRes.json();
-            videoUrl = uploadData.videoPath; // Hasil: /videos/{typeName}/{guideTitle}/{timestamp}.mp4
+            videoUrl = uploadData.videoPath;
         }
 
-        // 2. Simpan Data Guide ke Database
         const payload = {
             groupId: parseInt(state.groupId, 10),
             title,
@@ -486,7 +511,6 @@ async function handleSaveGuide(e) {
 
         closeGuideModal();
 
-        // 3. Refresh UI
         if (state.groupId) {
             await fetchGuidesByGroup(state.groupId);
         } else {

@@ -356,7 +356,7 @@ router.get('/groups', async (req, res, next) => {
     }
 });
 
-// GET single guide group by ID (with nested guides list)
+// GET single guide group by ID (with nested type & guides list)
 router.get('/groups/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
@@ -367,6 +367,12 @@ router.get('/groups/:id', async (req, res, next) => {
                 gg.title,
                 gg.description,
                 gg.group_order AS "groupOrder",
+                
+                json_build_object(
+                    'id', gt.id,
+                    'name', COALESCE(gt.title) 
+                ) AS type,
+
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -378,17 +384,22 @@ router.get('/groups/:id', async (req, res, next) => {
                     ) FILTER (WHERE g.id IS NOT NULL),
                     '[]'
                 ) AS guides
+
             FROM guide_groups gg
+            INNER JOIN type gt ON gg.type_id = gt.id 
             LEFT JOIN guide g ON gg.id = g.group_id
             WHERE gg.id = $1
-            GROUP BY gg.id;
+            GROUP BY gg.id, gg.type_id, gg.title, gg.description, gg.group_order, gt.id, gt.title;
         `;
+
         const { rows } = await db.query(queryText, [id]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Guide Group not found' });
         }
+
         res.json(rows[0]);
     } catch (error) {
+        console.error('Error on GET /groups/:id:', error); // Log error asli ke terminal Node.js
         next(error);
     }
 });

@@ -45,6 +45,33 @@ async function init() {
 }
 
 /**
+ * Helper untuk menampilkan toast notification
+ */
+function showToast(message) {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>${escapeHTML(message)}</span>`;
+
+    container.appendChild(toast);
+
+    // Trigger animasi masuk
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    // Hapus toast setelah 3 detik
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+/**
  * Fetch Detail Metadata Group, Type, sekaligus Daftar Guides
  */
 async function fetchGroupDetails(groupId) {
@@ -523,8 +550,10 @@ async function handleSaveGuide(e) {
 
         if (isEdit) {
             await openGuideDetail(id);
+            showToast(`Berhasil memperbarui guide "${title}"`);
         } else {
             renderListView();
+            showToast(`Berhasil menambahkan guide "${title}"`);
         }
 
     } catch (error) {
@@ -571,13 +600,18 @@ function closeDrawer() {
 }
 
 async function deleteGuide(id) {
+    const guideTitle = state.currentGuide ? state.currentGuide.title : '';
+
     try {
         const response = await fetch(`${API_BASE}/guides/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Gagal menghapus guide');
 
-        alert('Guide berhasil dihapus.');
         state.guides = state.guides.filter(g => g.id !== parseInt(id, 10));
         renderListView();
+
+        // Tampilkan toast notifikasi berhasil hapus
+        showToast(`Berhasil menghapus guide ${guideTitle ? `"${guideTitle}"` : ''}`);
+
     } catch (error) {
         console.error('Error deleting guide:', error);
         alert('Gagal menghapus guide.');

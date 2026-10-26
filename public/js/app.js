@@ -614,6 +614,7 @@ async function handleCreateType() {
         elements.newTypeTitleInput.value = '';
         await fetchAndRenderTypes();
         renderManageTypeList();
+        showToast(`Berhasil menambahkan type "${title}"`);
 
     } catch (error) {
         console.error('Error creating type:', error);
@@ -711,6 +712,7 @@ async function handleUpdateType(e) {
         }
 
         closeAllModals();
+        showToast(`Berhasil memperbarui type "${title}"`);
         await fetchAndRenderTypes();
         if (state.selectedTypeId == id) selectType(id);
 
@@ -729,6 +731,7 @@ async function handleDeleteType(id, title) {
 
         await fetchAndRenderTypes();
         renderManageTypeList();
+        showToast(`Berhasil menghapus type "${title}"`);
 
         if (state.selectedTypeId == id) {
             state.selectedTypeId = state.types.length > 0 ? state.types[0].id : null;
@@ -812,6 +815,7 @@ async function handleCreateGroup() {
         elements.newGroupTitleInput.value = '';
         await fetchAndRenderGuideGroups(state.selectedTypeId);
         renderManageGroupList();
+        showToast(`Berhasil menambahkan group "${title}"`);
 
     } catch (error) {
         console.error('Error creating group:', error);
@@ -875,6 +879,7 @@ async function handleUpdateGroup(e) {
         }
 
         closeAllModals();
+        showToast(`Berhasil memperbarui group "${title}"`);
 
         // Refresh daftar group dari typeId yang valid
         await fetchAndRenderGuideGroups(targetTypeId);
@@ -894,6 +899,7 @@ async function handleDeleteGroup(id, title) {
 
         await fetchAndRenderGuideGroups(state.selectedTypeId);
         renderManageGroupList();
+        showToast(`Berhasil memperbarui group "${title}"`);
 
     } catch (error) {
         console.error('Error deleting group:', error);
@@ -943,6 +949,33 @@ function selectSuggestion(groupId, groups, searchBar, suggestionsBox) {
         suggestionsBox.style.display = 'none';
         handleGuideGroupClick(selectedGroup);
     }
+}
+
+/**
+ * Helper untuk menampilkan toast notification
+ */
+function showToast(message) {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>${escapeHTML(message)}</span>`;
+
+    container.appendChild(toast);
+
+    // Trigger animasi masuk
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    // Hapus toast setelah 3 detik
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 function setupSearchSuggestions(groups) {

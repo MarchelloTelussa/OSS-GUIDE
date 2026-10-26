@@ -29,83 +29,6 @@
         header {display: flex; flex-direction: row; align-items: flex-end; margin: 1.5rem 5rem 0; width: 100%; max-height: 5rem;}
         .logoHeader { width: 2rem; aspect-ratio: 1 / 1; flex-shrink: 0; object-fit: contain;}
         .pageName {color: var(--main); font-size: 4rem; margin: 0 0 -0.75rem 0.5rem; padding: 0;}
-/* 1. Main Search Container */
-.searchContainer { 
-    position: relative; /* Digabung di sini */
-    display: flex; 
-    flex-direction: row; 
-    justify-content: space-between; 
-    align-items: center; 
-    width: 100%; 
-    height: 2.5rem; 
-    padding: 0.4rem 0.75rem; 
-    border-radius: 10px; 
-    border: 1px solid #000000; 
-    box-sizing: border-box; 
-    margin: 0; 
-    background-color: #ffffff; 
-}
-
-/* Input & Button Inside Search Container */
-.searchContainer input { 
-    border: none; 
-    outline: none; 
-    width: 100%; 
-    background: transparent; 
-}
-
-.searchContainer button { 
-    border: none; 
-    background: transparent; 
-    cursor: pointer; 
-    padding: 0 0.25rem; 
-}
-
-.searchContainer button:hover { 
-    color: var(--second); 
-}
-
-/* 2. Dropdown Suggestions Box */
-.search-suggestions-dropdown { 
-    position: absolute; 
-    top: calc(100% + 4px); 
-    left: 0; 
-    right: 0; 
-    background: #ffffff; 
-    border: 1px solid #e0e0e0; 
-    border-radius: 12px; 
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
-    z-index: 1000; 
-    overflow-y: auto; 
-    max-height: 280px; 
-}
-
-/* 3. Suggestion Items */
-.suggestion-item { 
-    display: flex; 
-    align-items: center; 
-    padding: 10px 16px; 
-    cursor: pointer; 
-    font-size: 14px; 
-    color: #333333; 
-    transition: background-color 0.15s ease; 
-}
-
-.suggestion-item:hover,
-.suggestion-item.active { 
-    background-color: #f2f2f2; 
-}
-
-.suggestion-item .icon-search { 
-    margin-right: 12px; 
-    color: #888888; 
-    font-size: 13px; 
-}
-
-.suggestion-item .suggestion-text strong { 
-    color: #000000; 
-    font-weight: 700; 
-}
 
         main {height: calc(100vh - 3.5rem); overflow: hidden; margin: 0.25rem 5rem 0; border: 1px solid black;}
         .content {display: flex; flex-direction: column; height: 100%;}
@@ -163,6 +86,21 @@
         .guideGroup {display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; min-height: 3rem; border: 1px solid var(--outline); border-radius: 6px; padding: 0.5rem 1rem; margin-bottom: 0.5rem; cursor: pointer; background-color: white;}
         .guideGroup:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); }
         .guideGroup h1 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .searchContainer { position: relative; display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; height: 2.5rem; padding: 0.4rem 0.75rem; border-radius: 10px; border: 1px solid #000000; box-sizing: border-box; margin: 0; background-color: #ffffff; }
+        .searchContainer input { border: none; outline: none; width: 100%; background: transparent; }
+        .searchContainer button { border: none; background: transparent; cursor: pointer; padding: 0 0.25rem; }
+        .searchContainer button:hover { color: var(--second); }
+
+        .search-suggestions-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1000; overflow-y: auto; max-height: 280px; }
+        .suggestion-item { display: flex; align-items: center; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #333333; transition: background-color 0.15s ease; }
+        .suggestion-item:hover, .suggestion-item.active { background-color: #f2f2f2; }
+        .suggestion-item .icon-search { margin-right: 12px; color: #888888; font-size: 13px; }
+        .suggestion-item .suggestion-text strong { color: #000000; font-weight: 700; }
+
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { min-width: 250px; padding: 12px 20px; border-radius: 6px; background-color: #2e7d32; color: #ffffff; font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: flex; align-items: center; gap: 10px; opacity: 0; transform: translateY(-20px); transition: all 0.3s ease; }
+        .toast.show { opacity: 1; transform: translateY(0); }
 
         /* Modal Base Styles */
         .backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.4); opacity: 0; visibility: hidden; transition: opacity 0.3s; z-index: 90; }

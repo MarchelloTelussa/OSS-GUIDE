@@ -121,11 +121,13 @@ const CustomDialog = {
             modal?.classList.add('active');
 
             const btnOk = document.getElementById('btnAlertOk');
-            btnOk.onclick = () => {
+            
+            btnOk.addEventListener('click', (e) => {
+                e.stopPropagation(); // Mencegah event bubbling ke backdrop
                 modal?.classList.remove('active');
                 backdrop?.classList.remove('active');
                 resolve(true);
-            };
+            }, { once: true });
         });
     },
 
@@ -163,8 +165,15 @@ const CustomDialog = {
                 resolve(result);
             };
 
-            btnConfirm.onclick = () => close(true);
-            btnCancel.onclick = () => close(false);
+            btnConfirm.addEventListener('click', (e) => {
+                e.stopPropagation(); // Hentikan propagasi agar langsung memicu resolve
+                close(true);
+            }, { once: true });
+
+            btnCancel.addEventListener('click', (e) => {
+                e.stopPropagation();
+                close(false);
+            }, { once: true });
         });
     }
 };

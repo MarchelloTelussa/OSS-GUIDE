@@ -262,7 +262,11 @@ function renderListView() {
     `;
 
     document.getElementById('btnBackDashboard').addEventListener('click', () => {
-        window.location.href = 'index.html';
+        if (document.referrer.includes('index.html')) {
+            window.history.back();
+        } else {
+            window.location.href = 'index.html';
+        }
     });
 
     if (isAdmin) {

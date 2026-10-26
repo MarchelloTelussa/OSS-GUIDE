@@ -1153,12 +1153,11 @@ function setupSearchSuggestions(groups) {
         const query = searchBar.value.toLowerCase().trim();
         selectedIndex = -1;
 
+        // Jika query kosong, CUKUP sembunyikan dropdown suggestions saja.
+        // JANGAN memanggil renderGuideGroups() di sini agar DOM searchBar tidak hancur/re-render!
         if (!query) {
             suggestionsBox.style.display = 'none';
             suggestionsBox.innerHTML = '';
-            // Cukup tampilkan kembali semua list group tanpa re-render seluruh komponen UI
-            const listContainer = document.getElementById('groupListContainer');
-            if (listContainer) renderGroupCards(groups, listContainer);
             return;
         }
 

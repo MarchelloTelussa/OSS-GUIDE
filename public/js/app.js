@@ -467,31 +467,31 @@ async function fetchAndRenderGuideGroups(typeId) {
 function renderGuideGroups(groups) {
     const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
 
-    // 1. Masukkan searchContainer ke dalam guideHeader
     let contentHTML = `
         <div class="guideHeader">
-        <div class="guideTitleRow">
-            <h1>Guide</h1>
-            ${isAdmin ? `
-                <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
-                    <i class="fa-solid fa-ellipsis-vertical"></i>
-                </button>
-            ` : ''}
+            <div class="guideTitleRow">
+                <h1>Guide</h1>
+                ${isAdmin ? `
+                    <button id="btnManageGroup" class="btnManageGroup" title="Manage Guide Group">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                ` : ''}
+            </div>
+            <div class="searchContainer" style="position: relative;">
+                <input id="searchBar" type="text" placeholder="Cari guide..." autocomplete="off">
+                <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
+                
+                <!-- Container untuk rekomendasi dropdown -->
+                <div id="searchSuggestions" class="search-suggestions-dropdown" style="display: none;"></div>
+            </div>
         </div>
-        <div class="searchContainer">
-            <input id="searchBar" type="text" placeholder="Cari guide...">
-            <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
-        </div>
-    </div>
-    <div id="groupListContainer"></div>
+        <div id="groupListContainer"></div>
     `;
 
     elements.guideGroupContainer.innerHTML = contentHTML;
 
-    // Element penampung daftar card grup
     const listContainer = document.getElementById('groupListContainer');
 
-    // Function internal untuk render card list
     function renderList(filteredGroups) {
         listContainer.innerHTML = '';
 
@@ -512,21 +512,10 @@ function renderGuideGroups(groups) {
         });
     }
 
-    // Render awal seluruh grup
     renderList(groups);
 
-    // 2. Tambahkan event listener untuk pencarian
-    const searchBar = document.getElementById('searchBar');
-    const searchBtn = document.getElementById('searchBtn');
-
-    function filterGroups() {
-        const query = searchBar.value.toLowerCase().trim();
-        const filtered = groups.filter(group => group.title.toLowerCase().includes(query));
-        renderList(filtered);
-    }
-
-    searchBar?.addEventListener('input', filterGroups);
-    searchBtn?.addEventListener('click', filterGroups);
+    // Event Listener Search & Auto-complete
+    setupSearchSuggestions(groups);
 
     if (isAdmin) {
         document.getElementById('btnManageGroup')?.addEventListener('click', openManageGroupModal);
@@ -928,6 +917,88 @@ function handleSearch() {
     );
 
     renderGuideGroups(filteredGroups);
+}
+
+function setupSearchSuggestions(groups) {
+    const searchBar = document.getElementById('searchBar');
+    const searchBtn = document.getElementById('searchBtn');
+    const suggestionsBox = document.getElementById('searchSuggestions');
+
+    if (!searchBar || !suggestionsBox) return;
+
+    // Fungsi Render Rekomendasi Dropdown
+    function showSuggestions() {
+        const query = searchBar.value.toLowerCase().trim();
+
+        if (!query) {
+            suggestionsBox.style.display = 'none';
+            suggestionsBox.innerHTML = '';
+            renderList(groups); // Kembalikan ke list lengkap
+            return;
+        }
+
+        // Filter daftar grup yang sesuai dengan query
+        const matches = groups.filter(group =>
+            group.title.toLowerCase().includes(query) ||
+            (group.description && group.description.toLowerCase().includes(query))
+        );
+
+        if (matches.length === 0) {
+            suggestionsBox.style.display = 'none';
+            suggestionsBox.innerHTML = '';
+            return;
+        }
+
+        // Buat item daftar rekomendasi
+        suggestionsBox.innerHTML = matches.map(group => `
+            <div class="suggestion-item" data-id="${group.id}">
+                <i class="fa-solid fa-magnifying-glass icon-search"></i>
+                <span class="suggestion-text">${highlightMatch(group.title, query)}</span>
+            </div>
+        `).join('');
+
+        suggestionsBox.style.display = 'block';
+
+        // Event listener saat item rekomendasi diklik
+        suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const groupId = item.dataset.id;
+                const selectedGroup = groups.find(g => g.id == groupId);
+                
+                if (selectedGroup) {
+                    searchBar.value = selectedGroup.title;
+                    suggestionsBox.style.display = 'none';
+                    handleGuideGroupClick(selectedGroup); // Langsung navigasi ke detail guide
+                }
+            });
+        });
+    }
+
+    // Highlighting kata yang cocok
+    function highlightMatch(text, query) {
+        const escapedText = escapeHTML(text);
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return escapedText.replace(regex, '<strong>$1</strong>');
+    }
+
+    // Listeners Event
+    searchBar.addEventListener('input', showSuggestions);
+    searchBar.addEventListener('focus', showSuggestions);
+
+    // Sembunyikan dropdown saat klik di luar pencarian
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.searchContainer')) {
+            suggestionsBox.style.display = 'none';
+        }
+    });
+
+    // Tombol search biasa
+    searchBtn?.addEventListener('click', () => {
+        suggestionsBox.style.display = 'none';
+        const query = searchBar.value.toLowerCase().trim();
+        const filtered = groups.filter(g => g.title.toLowerCase().includes(query));
+        renderList(filtered);
+    });
 }
 
 function handleGuideGroupClick(group) {

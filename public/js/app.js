@@ -919,6 +919,32 @@ function handleSearch() {
     renderGuideGroups(filteredGroups);
 }
 
+/**
+ * Helper untuk menandai item dropdown yang aktif via Navigasi Keyboard
+ */
+function updateActiveSuggestion(items, selectedIndex) {
+    items.forEach((item, index) => {
+        if (index === selectedIndex) {
+            item.classList.add('active');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+/**
+ * Helper untuk eksekusi seleksi Guide Group dari dropdown pencarian
+ */
+function selectSuggestion(groupId, groups, searchBar, suggestionsBox) {
+    const selectedGroup = groups.find(g => g.id == groupId);
+    if (selectedGroup) {
+        searchBar.value = '';
+        suggestionsBox.style.display = 'none';
+        handleGuideGroupClick(selectedGroup);
+    }
+}
+
 function setupSearchSuggestions(groups) {
     const searchBar = document.getElementById('searchBar');
     const searchBtn = document.getElementById('searchBtn');
@@ -926,18 +952,22 @@ function setupSearchSuggestions(groups) {
 
     if (!searchBar || !suggestionsBox) return;
 
-    // Fungsi Render Rekomendasi Dropdown
+    searchBar.value = '';
+    let selectedIndex = -1;
+
     function showSuggestions() {
         const query = searchBar.value.toLowerCase().trim();
+        selectedIndex = -1;
 
         if (!query) {
             suggestionsBox.style.display = 'none';
             suggestionsBox.innerHTML = '';
-            renderList(groups); // Kembalikan ke list lengkap
+            // Cukup tampilkan kembali semua list group tanpa re-render seluruh komponen UI
+            const listContainer = document.getElementById('groupListContainer');
+            if (listContainer) renderGroupCards(groups, listContainer);
             return;
         }
 
-        // Filter daftar grup yang sesuai dengan query
         const matches = groups.filter(group =>
             group.title.toLowerCase().includes(query) ||
             (group.description && group.description.toLowerCase().includes(query))
@@ -949,9 +979,8 @@ function setupSearchSuggestions(groups) {
             return;
         }
 
-        // Buat item daftar rekomendasi
-        suggestionsBox.innerHTML = matches.map(group => `
-            <div class="suggestion-item" data-id="${group.id}">
+        suggestionsBox.innerHTML = matches.map((group, index) => `
+            <div class="suggestion-item" data-id="${group.id}" data-index="${index}">
                 <i class="fa-solid fa-magnifying-glass icon-search"></i>
                 <span class="suggestion-text">${highlightMatch(group.title, query)}</span>
             </div>
@@ -959,45 +988,68 @@ function setupSearchSuggestions(groups) {
 
         suggestionsBox.style.display = 'block';
 
-        // Event listener saat item rekomendasi diklik
         suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const groupId = item.dataset.id;
-                const selectedGroup = groups.find(g => g.id == groupId);
-                
-                if (selectedGroup) {
-                    searchBar.value = selectedGroup.title;
-                    suggestionsBox.style.display = 'none';
-                    handleGuideGroupClick(selectedGroup); // Langsung navigasi ke detail guide
-                }
+            item.addEventListener('click', () => {
+                selectSuggestion(item.dataset.id, groups, searchBar, suggestionsBox);
             });
         });
     }
 
-    // Highlighting kata yang cocok
     function highlightMatch(text, query) {
         const escapedText = escapeHTML(text);
         const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         return escapedText.replace(regex, '<strong>$1</strong>');
     }
 
-    // Listeners Event
     searchBar.addEventListener('input', showSuggestions);
     searchBar.addEventListener('focus', showSuggestions);
 
-    // Sembunyikan dropdown saat klik di luar pencarian
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.searchContainer')) {
+    searchBar.addEventListener('keydown', (e) => {
+        const items = suggestionsBox.querySelectorAll('.suggestion-item');
+        const isBoxVisible = suggestionsBox.style.display === 'block' && items.length > 0;
+
+        if (e.key === 'ArrowDown') {
+            if (!isBoxVisible) return;
+            e.preventDefault();
+            selectedIndex = (selectedIndex + 1) % items.length;
+            updateActiveSuggestion(items, selectedIndex);
+
+        } else if (e.key === 'ArrowUp') {
+            if (!isBoxVisible) return;
+            e.preventDefault();
+            selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+            updateActiveSuggestion(items, selectedIndex);
+
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+
+            if (isBoxVisible && selectedIndex >= 0 && items[selectedIndex]) {
+                const groupId = items[selectedIndex].dataset.id;
+                selectSuggestion(groupId, groups, searchBar, suggestionsBox);
+                selectedIndex = -1;
+            } else {
+                suggestionsBox.style.display = 'none';
+                selectedIndex = -1;
+                handleSearch();
+            }
+
+        } else if (e.key === 'Escape') {
             suggestionsBox.style.display = 'none';
+            selectedIndex = -1;
         }
     });
 
-    // Tombol search biasa
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.searchContainer')) {
+            suggestionsBox.style.display = 'none';
+            selectedIndex = -1;
+        }
+    });
+
     searchBtn?.addEventListener('click', () => {
         suggestionsBox.style.display = 'none';
-        const query = searchBar.value.toLowerCase().trim();
-        const filtered = groups.filter(g => g.title.toLowerCase().includes(query));
-        renderList(filtered);
+        selectedIndex = -1;
+        handleSearch();
     });
 }
 

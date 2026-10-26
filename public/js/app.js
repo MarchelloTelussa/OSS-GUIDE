@@ -578,7 +578,11 @@ async function handleCreateType() {
     const title = elements.newTypeTitleInput.value.trim();
 
     if (!title) {
-        alert('Judul Type tidak boleh kosong!');
+        CustomDialog.showAlert({
+            title: 'Input Kosong',
+            message: 'Judul Type tidak boleh kosong!',
+            type: 'warning'
+        });
         return;
     }
 
@@ -590,7 +594,11 @@ async function handleCreateType() {
     });
 
     if (isDuplicate) {
-        alert(`Peringatan: Type dengan nama "${title}" sudah ada (atau mirip tanpa spasi). Silakan gunakan nama lain!`);
+        CustomDialog.showAlert({
+            title: 'Nama Duplikat',
+            message: `Type dengan nama "${title}" sudah ada. Silakan gunakan nama lain!`,
+            type: 'warning'
+        });
         return;
     }
 
@@ -618,7 +626,11 @@ async function handleCreateType() {
 
     } catch (error) {
         console.error('Error creating type:', error);
-        alert(error.message || 'Gagal membuat type.');
+        CustomDialog.showAlert({
+            title: 'Gagal Tambah Type',
+            message: error.message || 'Gagal membuat type.',
+            type: 'danger'
+        });
     }
 }
 
@@ -656,7 +668,11 @@ async function handleUpdateType(e) {
     const parentSlug = elements.editTypeParentSelect ? elements.editTypeParentSelect.value : 'web';
     
     if (!title) {
-        alert('Judul Type tidak boleh kosong!');
+        CustomDialog.showAlert({
+            title: 'Input Kosong',
+            message: 'Judul Type tidak boleh kosong!',
+            type: 'warning'
+        });
         return;
     }
 
@@ -669,7 +685,11 @@ async function handleUpdateType(e) {
     });
 
     if (isDuplicate) {
-        alert(`Peringatan: Type dengan nama "${title}" sudah digunakan oleh Type lain (atau mirip tanpa spasi). Silakan gunakan nama lain!`);
+        CustomDialog.showAlert({
+            title: 'Nama Duplikat',
+            message: `Type dengan nama "${title}" sudah digunakan oleh Type lain. Silakan gunakan nama lain!`,
+            type: 'warning'
+        });
         return;
     }
 
@@ -699,7 +719,7 @@ async function handleUpdateType(e) {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                parentSlug, // <-- Kirim parentSlug ke backend
+                parentSlug,
                 title, 
                 description, 
                 imgUrl: finalImgUrl 
@@ -712,18 +732,29 @@ async function handleUpdateType(e) {
         }
 
         closeAllModals();
-        showToast(`Berhasil memperbarui type "${title}"`);
         await fetchAndRenderTypes();
         if (state.selectedTypeId == id) selectType(id);
+        showToast(`Berhasil memperbarui type "${title}"`);
 
     } catch (error) {
         console.error('Error updating type:', error);
-        alert(error.message || 'Gagal mengupdate type.');
+        CustomDialog.showAlert({
+            title: 'Gagal Update Type',
+            message: error.message || 'Gagal mengupdate type.',
+            type: 'danger'
+        });
     }
 }
 
 async function handleDeleteType(id, title) {
-    if (!confirm(`Apakah Anda yakin ingin menghapus Type "${title}"?`)) return;
+    const isConfirmed = await CustomDialog.showConfirm({
+        title: 'Hapus Type',
+        message: `Apakah Anda yakin ingin menghapus Type "${title}"?`,
+        confirmText: 'Ya, Hapus',
+        cancelText: 'Batal'
+    });
+
+    if (!isConfirmed) return;
 
     try {
         const response = await fetch(`${API_BASE}/types/${id}`, { method: 'DELETE' });
@@ -731,16 +762,21 @@ async function handleDeleteType(id, title) {
 
         await fetchAndRenderTypes();
         renderManageTypeList();
-        showToast(`Berhasil menghapus type "${title}"`);
 
         if (state.selectedTypeId == id) {
             state.selectedTypeId = state.types.length > 0 ? state.types[0].id : null;
             if (state.selectedTypeId) selectType(state.selectedTypeId);
         }
 
+        showToast(`Berhasil menghapus type "${title}"`);
+
     } catch (error) {
         console.error('Error deleting type:', error);
-        alert('Gagal menghapus type.');
+        CustomDialog.showAlert({
+            title: 'Gagal Hapus',
+            message: 'Gagal menghapus type dari server.',
+            type: 'danger'
+        });
     }
 }
 
@@ -786,12 +822,20 @@ async function handleCreateGroup() {
     const title = elements.newGroupTitleInput.value.trim();
 
     if (!state.selectedTypeId) {
-        alert('Pilih Type terlebih dahulu sebelum menambahkan group!');
+        CustomDialog.showAlert({
+            title: 'Type Belum Dipilih',
+            message: 'Pilih Type terlebih dahulu sebelum menambahkan group!',
+            type: 'warning'
+        });
         return;
     }
 
     if (!title) {
-        alert('Judul Guide Group tidak boleh kosong!');
+        CustomDialog.showAlert({
+            title: 'Input Kosong',
+            message: 'Judul Guide Group tidak boleh kosong!',
+            type: 'warning'
+        });
         return;
     }
 
@@ -819,7 +863,11 @@ async function handleCreateGroup() {
 
     } catch (error) {
         console.error('Error creating group:', error);
-        alert(error.message || 'Gagal membuat guide group.');
+        CustomDialog.showAlert({
+            title: 'Gagal Tambah Group',
+            message: error.message || 'Gagal membuat guide group.',
+            type: 'danger'
+        });
     }
 }
 
@@ -845,11 +893,14 @@ async function handleUpdateGroup(e) {
     const description = elements.editGroupDesc.value.trim();
     const groupOrder = parseInt(elements.editGroupOrder.value, 10) || 0;
 
-    // Ambil typeId dari dataset modal, jika tidak ada baru gunakan state.selectedTypeId
     const targetTypeId = elements.editGroupForm?.dataset?.typeId || state.selectedTypeId;
 
     if (!targetTypeId) {
-        alert('Gagal memperbarui: Type ID tidak ditemukan.');
+        CustomDialog.showAlert({
+            title: 'Type ID Hilang',
+            message: 'Gagal memperbarui: Type ID tidak ditemukan.',
+            type: 'danger'
+        });
         return;
     }
 
@@ -865,7 +916,6 @@ async function handleUpdateGroup(e) {
             })
         });
 
-        // Ambil text mentah terlebih dahulu untuk mencegah error JSON.parse jika server merespons HTML
         const responseText = await response.text();
         let responseData;
         try {
@@ -879,19 +929,28 @@ async function handleUpdateGroup(e) {
         }
 
         closeAllModals();
-        showToast(`Berhasil memperbarui group "${title}"`);
-
-        // Refresh daftar group dari typeId yang valid
         await fetchAndRenderGuideGroups(targetTypeId);
+        showToast(`Berhasil memperbarui group "${title}"`);
 
     } catch (error) {
         console.error('Error updating group:', error);
-        alert(error.message || 'Gagal mengupdate guide group.');
+        CustomDialog.showAlert({
+            title: 'Gagal Update Group',
+            message: error.message || 'Gagal mengupdate guide group.',
+            type: 'danger'
+        });
     }
 }
 
 async function handleDeleteGroup(id, title) {
-    if (!confirm(`Apakah Anda yakin ingin menghapus Group "${title}" beserta seluruh guidenya?`)) return;
+    const isConfirmed = await CustomDialog.showConfirm({
+        title: 'Hapus Guide Group',
+        message: `Apakah Anda yakin ingin menghapus Group "${title}" beserta seluruh guidenya?`,
+        confirmText: 'Ya, Hapus',
+        cancelText: 'Batal'
+    });
+
+    if (!isConfirmed) return;
 
     try {
         const response = await fetch(`${API_BASE}/groups/${id}`, { method: 'DELETE' });
@@ -899,11 +958,15 @@ async function handleDeleteGroup(id, title) {
 
         await fetchAndRenderGuideGroups(state.selectedTypeId);
         renderManageGroupList();
-        showToast(`Berhasil memperbarui group "${title}"`);
+        showToast(`Berhasil menghapus group "${title}"`);
 
     } catch (error) {
         console.error('Error deleting group:', error);
-        alert('Gagal menghapus group.');
+        CustomDialog.showAlert({
+            title: 'Gagal Hapus',
+            message: 'Gagal menghapus group dari server.',
+            type: 'danger'
+        });
     }
 }
 
@@ -977,6 +1040,104 @@ function showToast(message) {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+/**
+ * Custom Dialog System (Auto-Inject DOM via JS)
+ */
+const CustomDialog = {
+    init() {
+        if (document.getElementById('customAlertModal')) return;
+
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'customAlertModal';
+        modalDiv.className = 'custom-alert-modal';
+        modalDiv.innerHTML = `
+            <div class="custom-alert-content">
+                <div id="customAlertIcon" class="custom-alert-icon"></div>
+                <h3 id="customAlertTitle" class="custom-alert-title">Notifikasi</h3>
+                <p id="customAlertMessage" class="custom-alert-message"></p>
+                <div id="customAlertActions" class="custom-alert-actions"></div>
+            </div>
+        `;
+        document.body.appendChild(modalDiv);
+    },
+
+    showAlert({ title = 'Peringatan', message = '', type = 'warning', buttonText = 'OK' }) {
+        this.init();
+
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customAlertModal');
+            const backdrop = document.getElementById('backdrop');
+            const iconContainer = document.getElementById('customAlertIcon');
+            const titleElement = document.getElementById('customAlertTitle');
+            const messageElement = document.getElementById('customAlertMessage');
+            const actionsContainer = document.getElementById('customAlertActions');
+
+            let iconHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            if (type === 'danger') iconHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+            if (type === 'confirm') iconHTML = '<i class="fa-solid fa-circle-question"></i>';
+
+            iconContainer.className = `custom-alert-icon ${type}`;
+            iconContainer.innerHTML = iconHTML;
+
+            titleElement.innerText = title;
+            messageElement.innerText = message;
+
+            actionsContainer.innerHTML = `
+                <button id="btnAlertOk" class="btn-alert btn-alert-primary">${buttonText}</button>
+            `;
+
+            backdrop?.classList.add('active');
+            modal?.classList.add('active');
+
+            const btnOk = document.getElementById('btnAlertOk');
+            btnOk.onclick = () => {
+                modal?.classList.remove('active');
+                backdrop?.classList.remove('active');
+                resolve(true);
+            };
+        });
+    },
+
+    showConfirm({ title = 'Konfirmasi', message = 'Apakah Anda yakin?', confirmText = 'Ya', cancelText = 'Batal' }) {
+        this.init();
+
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customAlertModal');
+            const backdrop = document.getElementById('backdrop');
+            const iconContainer = document.getElementById('customAlertIcon');
+            const titleElement = document.getElementById('customAlertTitle');
+            const messageElement = document.getElementById('customAlertMessage');
+            const actionsContainer = document.getElementById('customAlertActions');
+
+            iconContainer.className = 'custom-alert-icon confirm';
+            iconContainer.innerHTML = '<i class="fa-solid fa-circle-question"></i>';
+
+            titleElement.innerText = title;
+            messageElement.innerText = message;
+
+            actionsContainer.innerHTML = `
+                <button id="btnAlertCancel" class="btn-alert btn-alert-secondary">${cancelText}</button>
+                <button id="btnAlertConfirm" class="btn-alert btn-alert-danger">${confirmText}</button>
+            `;
+
+            backdrop?.classList.add('active');
+            modal?.classList.add('active');
+
+            const btnConfirm = document.getElementById('btnAlertConfirm');
+            const btnCancel = document.getElementById('btnAlertCancel');
+
+            const close = (result) => {
+                modal?.classList.remove('active');
+                backdrop?.classList.remove('active');
+                resolve(result);
+            };
+
+            btnConfirm.onclick = () => close(true);
+            btnCancel.onclick = () => close(false);
+        });
+    }
+};
 
 function setupSearchSuggestions(groups) {
     const searchBar = document.getElementById('searchBar');

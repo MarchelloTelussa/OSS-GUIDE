@@ -72,6 +72,104 @@ function showToast(message) {
 }
 
 /**
+ * Custom Dialog System (Auto-Inject DOM via JS)
+ */
+const CustomDialog = {
+    init() {
+        if (document.getElementById('customAlertModal')) return;
+
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'customAlertModal';
+        modalDiv.className = 'custom-alert-modal';
+        modalDiv.innerHTML = `
+            <div class="custom-alert-content">
+                <div id="customAlertIcon" class="custom-alert-icon"></div>
+                <h3 id="customAlertTitle" class="custom-alert-title">Notifikasi</h3>
+                <p id="customAlertMessage" class="custom-alert-message"></p>
+                <div id="customAlertActions" class="custom-alert-actions"></div>
+            </div>
+        `;
+        document.body.appendChild(modalDiv);
+    },
+
+    showAlert({ title = 'Peringatan', message = '', type = 'warning', buttonText = 'OK' }) {
+        this.init();
+
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customAlertModal');
+            const backdrop = document.getElementById('backdrop');
+            const iconContainer = document.getElementById('customAlertIcon');
+            const titleElement = document.getElementById('customAlertTitle');
+            const messageElement = document.getElementById('customAlertMessage');
+            const actionsContainer = document.getElementById('customAlertActions');
+
+            let iconHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            if (type === 'danger') iconHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+            if (type === 'confirm') iconHTML = '<i class="fa-solid fa-circle-question"></i>';
+
+            iconContainer.className = `custom-alert-icon ${type}`;
+            iconContainer.innerHTML = iconHTML;
+
+            titleElement.innerText = title;
+            messageElement.innerText = message;
+
+            actionsContainer.innerHTML = `
+                <button id="btnAlertOk" class="btn-alert btn-alert-primary">${buttonText}</button>
+            `;
+
+            backdrop?.classList.add('active');
+            modal?.classList.add('active');
+
+            const btnOk = document.getElementById('btnAlertOk');
+            btnOk.onclick = () => {
+                modal?.classList.remove('active');
+                backdrop?.classList.remove('active');
+                resolve(true);
+            };
+        });
+    },
+
+    showConfirm({ title = 'Konfirmasi', message = 'Apakah Anda yakin?', confirmText = 'Ya', cancelText = 'Batal' }) {
+        this.init();
+
+        return new Promise((resolve) => {
+            const modal = document.getElementById('customAlertModal');
+            const backdrop = document.getElementById('backdrop');
+            const iconContainer = document.getElementById('customAlertIcon');
+            const titleElement = document.getElementById('customAlertTitle');
+            const messageElement = document.getElementById('customAlertMessage');
+            const actionsContainer = document.getElementById('customAlertActions');
+
+            iconContainer.className = 'custom-alert-icon confirm';
+            iconContainer.innerHTML = '<i class="fa-solid fa-circle-question"></i>';
+
+            titleElement.innerText = title;
+            messageElement.innerText = message;
+
+            actionsContainer.innerHTML = `
+                <button id="btnAlertCancel" class="btn-alert btn-alert-secondary">${cancelText}</button>
+                <button id="btnAlertConfirm" class="btn-alert btn-alert-danger">${confirmText}</button>
+            `;
+
+            backdrop?.classList.add('active');
+            modal?.classList.add('active');
+
+            const btnConfirm = document.getElementById('btnAlertConfirm');
+            const btnCancel = document.getElementById('btnAlertCancel');
+
+            const close = (result) => {
+                modal?.classList.remove('active');
+                backdrop?.classList.remove('active');
+                resolve(result);
+            };
+
+            btnConfirm.onclick = () => close(true);
+            btnCancel.onclick = () => close(false);
+        });
+    }
+};
+
+/**
  * Fetch Detail Metadata Group, Type, sekaligus Daftar Guides
  */
 async function fetchGroupDetails(groupId) {
@@ -335,7 +433,11 @@ async function openGuideDetail(id) {
         renderDetailView();
     } catch (error) {
         console.error('Error opening guide detail:', error);
-        alert('Gagal memuat detail guide.');
+        CustomDialog.showAlert({
+            title: 'Gagal Memuat Detail',
+            message: 'Gagal memuat detail guide dari server.',
+            type: 'danger'
+        });
     }
 }
 
@@ -385,7 +487,14 @@ function renderDetailView() {
         });
 
         document.getElementById('btnDeleteGuide')?.addEventListener('click', async () => {
-            if (confirm(`Apakah Anda yakin ingin menghapus guide "${guide.title}"?`)) {
+            const isConfirmed = await CustomDialog.showConfirm({
+                title: 'Hapus Guide',
+                message: `Apakah Anda yakin ingin menghapus guide "${guide.title}"?`,
+                confirmText: 'Ya, Hapus',
+                cancelText: 'Batal'
+            });
+
+            if (isConfirmed) {
                 await deleteGuide(guide.id);
             }
         });
@@ -398,7 +507,11 @@ function renderDetailView() {
 
 function openAddGuideModal() {
     if (!state.groupId) {
-        alert('Pilih Guide Group terlebih dahulu dari Dashboard.');
+        CustomDialog.showAlert({
+            title: 'Group Belum Dipilih',
+            message: 'Pilih Guide Group terlebih dahulu dari Dashboard.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -485,12 +598,20 @@ async function handleSaveGuide(e) {
         .filter(val => val !== '');
 
     if (!videoFile && !state.existingVideoUrl) {
-        alert('Harap pilih file video untuk guide ini.');
+        CustomDialog.showAlert({
+            title: 'Video Diperlukan',
+            message: 'Harap pilih file video untuk guide ini.',
+            type: 'warning'
+        });
         return;
     }
 
     if (!state.groupId) {
-        alert('Group ID tidak valid. Silakan pilih Guide Group terlebih dahulu.');
+        CustomDialog.showAlert({
+            title: 'Group ID Hilang',
+            message: 'Group ID tidak valid. Silakan pilih Guide Group terlebih dahulu.',
+            type: 'warning'
+        });
         return;
     }
 
@@ -558,7 +679,11 @@ async function handleSaveGuide(e) {
 
     } catch (error) {
         console.error('Error saving guide:', error);
-        alert(error.message || 'Gagal menyimpan guide.');
+        CustomDialog.showAlert({
+            title: 'Gagal Menyimpan',
+            message: error.message || 'Gagal menyimpan guide ke server.',
+            type: 'danger'
+        });
     }
 }
 
@@ -602,6 +727,15 @@ function closeDrawer() {
 async function deleteGuide(id) {
     const guideTitle = state.currentGuide ? state.currentGuide.title : '';
 
+    const isConfirmed = await CustomDialog.showConfirm({
+        title: 'Hapus Guide',
+        message: `Apakah Anda yakin ingin menghapus guide ${guideTitle ? `"${guideTitle}"` : ''}?`,
+        confirmText: 'Ya, Hapus',
+        cancelText: 'Batal'
+    });
+
+    if (!isConfirmed) return;
+
     try {
         const response = await fetch(`${API_BASE}/guides/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Gagal menghapus guide');
@@ -614,7 +748,11 @@ async function deleteGuide(id) {
 
     } catch (error) {
         console.error('Error deleting guide:', error);
-        alert('Gagal menghapus guide.');
+        CustomDialog.showAlert({
+            title: 'Gagal Hapus',
+            message: 'Gagal menghapus guide dari server.',
+            type: 'danger'
+        });
     }
 }
 

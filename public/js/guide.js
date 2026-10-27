@@ -341,10 +341,6 @@ function renderListView() {
     closeDrawer();
 
     const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
-    const filteredGuides = state.guides.filter(g => 
-        g.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-        (g.functionDesc && g.functionDesc.toLowerCase().includes(state.searchQuery.toLowerCase()))
-    );
 
     // Menentukan nama Type dan Nama Group secara dinamis
     const typeName = state.type?.name ? state.type.name.toUpperCase() : 'GUIDE';
@@ -374,8 +370,8 @@ function renderListView() {
                     </div>
                 </div>
                 <div class="guideCardContainer">
-                    ${filteredGuides.length > 0 
-                        ? filteredGuides.map(guide => `
+                    ${state.guides.length > 0 
+                        ? state.guides.map(guide => `
                             <div class="guideCard" data-id="${guide.id}">
                                 <div>
                                     <h2>${escapeHTML(guide.title)}</h2>
@@ -388,7 +384,7 @@ function renderListView() {
                             <div class="empty-guide-state">
                                 <img src="./img/guideNotFound.png" alt="Guide Not Found" class="empty-guide-img">
                                 <h2>Tidak Ada Guide Ditemukan</h2>
-                                <p>Maaf, guide yang Anda cari tidak tersedia atau belum ditambahkan.</p>
+                                <p>Maaf, guide tidak tersedia atau belum ditambahkan.</p>
                             </div>
                         `
                     }
@@ -408,19 +404,6 @@ function renderListView() {
     if (isAdmin) {
         document.getElementById('btnAddGuide')?.addEventListener('click', () => openAddGuideModal());
     }
-
-    const searchBar = document.getElementById('searchBar');
-    const searchBtn = document.getElementById('searchBtn');
-
-    const handleSearch = () => {
-        state.searchQuery = searchBar.value.trim();
-        renderListView();
-    };
-
-    searchBtn.addEventListener('click', handleSearch);
-    searchBar.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSearch();
-    });
 
     document.querySelectorAll('.guideCard').forEach(card => {
         card.addEventListener('click', async () => {

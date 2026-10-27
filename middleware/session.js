@@ -1,6 +1,7 @@
 // lib/session.js
 import crypto from 'crypto';
 import db from '../db.js';
+import cron from 'node-cron';
 export const COOKIE_NAME = 'oss_session';
 const MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 jam
 
@@ -97,6 +98,24 @@ export async function destroyAllUserSessions(userId) {
     const cleanUserId = parseInt(userId, 10);
     const result = await db.query('DELETE FROM sessions WHERE user_id = $1', [cleanUserId]);
     console.log(`[DEBUG] Menghapus ${result.rowCount} sesi lama milik user_id: ${cleanUserId}`);
+}
+
+/**
+ * Memulai job cron untuk menghapus sesi yang kadaluwarsa setiap 1 jam.
+ */
+export function startExpiredSessionCleanupJob() {
+    // String cron '0 * * * *' artinya: menit ke-0 pada setiap jam
+    const job = cron.schedule('0 * * * *', async () => {
+        try {
+            const result = await db.query('DELETE FROM sessions WHERE expires_at < NOW()');
+            console.log(`[CRON] Pembersihan sesi expired selesai. Menghapus ${result.rowCount || 0} sesi.`);
+        } catch (err) {
+            console.error('[CRON ERROR] Gagal menghapus sesi expired:', err);
+        }
+    });
+
+    console.log('[CRON] Scheduled job: Hapus sesi expired (setiap 1 jam) berhasil diaktifkan.');
+    return job;
 }
 
 // Cleanup otomatis background task

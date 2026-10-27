@@ -1,3 +1,5 @@
+import { CustomDialog } from './dialog.js';
+
 // State Management
 const state = {
     typeParents: [
@@ -578,7 +580,7 @@ async function handleCreateType() {
     const title = elements.newTypeTitleInput.value.trim();
 
     if (!title) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Input Kosong',
             message: 'Judul Type tidak boleh kosong!',
             type: 'warning'
@@ -594,7 +596,7 @@ async function handleCreateType() {
     });
 
     if (isDuplicate) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Nama Duplikat',
             message: `Type dengan nama "${title}" sudah ada. Silakan gunakan nama lain!`,
             type: 'warning'
@@ -626,7 +628,7 @@ async function handleCreateType() {
 
     } catch (error) {
         console.error('Error creating type:', error);
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Gagal Tambah Type',
             message: error.message || 'Gagal membuat type.',
             type: 'danger'
@@ -668,7 +670,7 @@ async function handleUpdateType(e) {
     const parentSlug = elements.editTypeParentSelect ? elements.editTypeParentSelect.value : 'web';
     
     if (!title) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Input Kosong',
             message: 'Judul Type tidak boleh kosong!',
             type: 'warning'
@@ -685,7 +687,7 @@ async function handleUpdateType(e) {
     });
 
     if (isDuplicate) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Nama Duplikat',
             message: `Type dengan nama "${title}" sudah digunakan oleh Type lain. Silakan gunakan nama lain!`,
             type: 'warning'
@@ -738,7 +740,7 @@ async function handleUpdateType(e) {
 
     } catch (error) {
         console.error('Error updating type:', error);
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Gagal Update Type',
             message: error.message || 'Gagal mengupdate type.',
             type: 'danger'
@@ -772,7 +774,7 @@ async function handleDeleteType(id, title) {
 
     } catch (error) {
         console.error('Error deleting type:', error);
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Gagal Hapus',
             message: 'Gagal menghapus type dari server.',
             type: 'danger'
@@ -822,7 +824,7 @@ async function handleCreateGroup() {
     const title = elements.newGroupTitleInput.value.trim();
 
     if (!state.selectedTypeId) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Type Belum Dipilih',
             message: 'Pilih Type terlebih dahulu sebelum menambahkan group!',
             type: 'warning'
@@ -831,7 +833,7 @@ async function handleCreateGroup() {
     }
 
     if (!title) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Input Kosong',
             message: 'Judul Guide Group tidak boleh kosong!',
             type: 'warning'
@@ -863,7 +865,7 @@ async function handleCreateGroup() {
 
     } catch (error) {
         console.error('Error creating group:', error);
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Gagal Tambah Group',
             message: error.message || 'Gagal membuat guide group.',
             type: 'danger'
@@ -896,7 +898,7 @@ async function handleUpdateGroup(e) {
     const targetTypeId = elements.editGroupForm?.dataset?.typeId || state.selectedTypeId;
 
     if (!targetTypeId) {
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Type ID Hilang',
             message: 'Gagal memperbarui: Type ID tidak ditemukan.',
             type: 'danger'
@@ -934,7 +936,7 @@ async function handleUpdateGroup(e) {
 
     } catch (error) {
         console.error('Error updating group:', error);
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Gagal Update Group',
             message: error.message || 'Gagal mengupdate guide group.',
             type: 'danger'
@@ -962,7 +964,7 @@ async function handleDeleteGroup(id, title) {
 
     } catch (error) {
         console.error('Error deleting group:', error);
-        CustomDialog.showAlert({
+        await CustomDialog.showAlert({
             title: 'Gagal Hapus',
             message: 'Gagal menghapus group dari server.',
             type: 'danger'

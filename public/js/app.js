@@ -980,10 +980,19 @@ function handleSearch() {
         return;
     }
 
-    const filteredGroups = state.groups.filter(group => 
-        group.title.toLowerCase().includes(query) || 
-        (group.description && group.description.toLowerCase().includes(query))
-    );
+    const filteredGroups = state.groups.filter(group => {
+        // 1. Cek pada Group (Title & Description)
+        const matchGroup = group.title.toLowerCase().includes(query) || 
+                           (group.description && group.description.toLowerCase().includes(query));
+
+        // 2. Cek pada anak Guides (Title & Function Desc)
+        const matchGuide = group.guides && group.guides.some(guide => 
+            guide.title.toLowerCase().includes(query) ||
+            (guide.functionDesc && guide.functionDesc.toLowerCase().includes(query))
+        );
+
+        return matchGroup || matchGuide;
+    });
 
     renderGuideGroups(filteredGroups);
 }
@@ -1162,18 +1171,46 @@ function setupSearchSuggestions(groups) {
         const query = searchBar.value.toLowerCase().trim();
         selectedIndex = -1;
 
-        // Jika query kosong, CUKUP sembunyikan dropdown suggestions saja.
-        // JANGAN memanggil renderGuideGroups() di sini agar DOM searchBar tidak hancur/re-render!
         if (!query) {
             suggestionsBox.style.display = 'none';
             suggestionsBox.innerHTML = '';
             return;
         }
 
-        const matches = groups.filter(group =>
-            group.title.toLowerCase().includes(query) ||
-            (group.description && group.description.toLowerCase().includes(query))
-        );
+        const matches = [];
+
+        groups.forEach(group => {
+            // A. Cek kecocokan di level Group
+            if (group.title.toLowerCase().includes(query) || 
+               (group.description && group.description.toLowerCase().includes(query))) {
+                matches.push({
+                    type: 'group',
+                    id: group.id,
+                    groupId: group.id,
+                    displayText: group.title,
+                    groupTitle: group.title
+                });
+            }
+
+            // B. Cek kecocokan di level Guide milik Group ini
+            if (group.guides && Array.isArray(group.guides)) {
+                group.guides.forEach(guide => {
+                    const matchTitle = guide.title.toLowerCase().includes(query);
+                    const matchDesc = guide.functionDesc && guide.functionDesc.toLowerCase().includes(query);
+
+                    if (matchTitle || matchDesc) {
+                        matches.push({
+                            type: 'guide',
+                            id: guide.id,
+                            groupId: group.id,
+                            displayText: `${group.title} : ${guide.title}`,
+                            groupTitle: group.title,
+                            guideTitle: guide.title
+                        });
+                    }
+                });
+            }
+        });
 
         if (matches.length === 0) {
             suggestionsBox.style.display = 'none';
@@ -1181,18 +1218,37 @@ function setupSearchSuggestions(groups) {
             return;
         }
 
-        suggestionsBox.innerHTML = matches.map((group, index) => `
-            <div class="suggestion-item" data-id="${group.id}" data-index="${index}">
-                <i class="fa-solid fa-magnifying-glass icon-search"></i>
-                <span class="suggestion-text">${highlightMatch(group.title, query)}</span>
+        // Render rekomendasi dengan format `Group : Guide`
+        suggestionsBox.innerHTML = matches.map((item, index) => `
+            <div class="suggestion-item" 
+                 data-type="${item.type}" 
+                 data-id="${item.id}" 
+                 data-group-id="${item.groupId}" 
+                 data-index="${index}">
+                <i class="fa-solid ${item.type === 'guide' ? 'fa-file-lines' : 'fa-folder'} icon-search"></i>
+                <span class="suggestion-text">${highlightMatch(item.displayText, query)}</span>
             </div>
         `).join('');
 
         suggestionsBox.style.display = 'block';
 
+        // Handler saat item dropdown diklik
         suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
-                selectSuggestion(item.dataset.id, groups, searchBar, suggestionsBox);
+                const targetType = item.dataset.type;
+                const targetId = item.dataset.id;
+                const targetGroupId = item.dataset.groupId;
+
+                searchBar.value = '';
+                suggestionsBox.style.display = 'none';
+
+                if (targetType === 'guide') {
+                    // Navigasi langsung ke halaman guide dengan parameter groupId & guideId
+                    window.location.href = `guide.html?groupId=${targetGroupId}&guideId=${targetId}`;
+                } else {
+                    // Navigasi ke halaman group
+                    window.location.href = `guide.html?groupId=${targetGroupId}`;
+                }
             });
         });
     }
@@ -1224,10 +1280,8 @@ function setupSearchSuggestions(groups) {
 
         } else if (e.key === 'Enter') {
             e.preventDefault();
-
             if (isBoxVisible && selectedIndex >= 0 && items[selectedIndex]) {
-                const groupId = items[selectedIndex].dataset.id;
-                selectSuggestion(groupId, groups, searchBar, suggestionsBox);
+                items[selectedIndex].click();
                 selectedIndex = -1;
             } else {
                 suggestionsBox.style.display = 'none';

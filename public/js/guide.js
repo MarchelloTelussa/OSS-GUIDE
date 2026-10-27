@@ -353,10 +353,6 @@ function renderListView() {
     viewContainer.innerHTML = `
         <header class="dashboardHeader">
             <h1 class="pageName">${escapeHTML(typeName)}</h1>
-            <div class="searchContainer">
-                <input id="searchBar" type="text" placeholder="Cari guide..." value="${escapeHTML(state.searchQuery)}">
-                <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
-            </div>
         </header>
         <main class="dashboardMain">
             <div class="content">
@@ -388,7 +384,13 @@ function renderListView() {
                                 <i class="fa-solid fa-chevron-right"></i>
                             </div>
                         `).join('')
-                        : `<p style="grid-column: 1/-1; padding: 1rem;">Tidak ada guide yang ditemukan.</p>`
+                        : `
+                            <div class="empty-guide-state">
+                                <img src="./img/guideNotFound.png" alt="Guide Not Found" class="empty-guide-img">
+                                <h2>Tidak Ada Guide Ditemukan</h2>
+                                <p>Maaf, guide yang Anda cari tidak tersedia atau belum ditambahkan.</p>
+                            </div>
+                        `
                     }
                 </div>
             </div>

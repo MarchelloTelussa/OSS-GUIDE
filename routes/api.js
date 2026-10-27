@@ -333,21 +333,38 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // =============================================================
 
 // GET all guide groups (optional filter by ?typeId=)
+// GET /groups?typeId=...
 router.get('/groups', async (req, res, next) => {
     const { typeId } = req.query;
     try {
         let queryText = `
-            SELECT id, type_id AS "typeId", title, description, group_order AS "groupOrder"
-            FROM guide_groups
+            SELECT 
+                gg.id, 
+                gg.type_id AS "typeId", 
+                gg.title, 
+                gg.description, 
+                gg.group_order AS "groupOrder",
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', g.id,
+                            'title', g.title,
+                            'functionDesc', g.function_desc
+                        ) ORDER BY g.id ASC
+                    ) FILTER (WHERE g.id IS NOT NULL),
+                    '[]'
+                ) AS guides
+            FROM guide_groups gg
+            LEFT JOIN guide g ON gg.id = g.group_id
         `;
         const params = [];
 
         if (typeId) {
-            queryText += ` WHERE type_id = $1`;
+            queryText += ` WHERE gg.type_id = $1`;
             params.push(typeId);
         }
 
-        queryText += ` ORDER BY group_order ASC, id ASC;`;
+        queryText += ` GROUP BY gg.id ORDER BY gg.group_order ASC, gg.id ASC;`;
 
         const { rows } = await db.query(queryText, params);
         res.json(rows);

@@ -66,6 +66,11 @@
         .toast { min-width: 250px; padding: 12px 20px; border-radius: 6px; background-color: #2e7d32; color: #ffffff; font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: flex; align-items: center; gap: 10px; opacity: 0; transform: translateY(-20px); transition: all 0.3s ease; }
         .toast.show { opacity: 1; transform: translateY(0); }
 
+        .empty-guide-state { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; text-align: center; }
+        .empty-guide-img { max-width: 280px; width: 100%; height: auto; margin-bottom: 1.5rem; object-fit: contain; }
+        .empty-guide-state h2 { font-size: 1.5rem; font-weight: 700; color: #1a1a1a; margin-bottom: 0.5rem; }
+        .empty-guide-state p { font-size: 1.1rem; color: #666666; max-width: 420px; margin: 0 auto; line-height: 1.5; }
+
         /* Overlay Drawer (Kanan) */
         .backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); opacity: 0; visibility: hidden; transition: opacity 0.3s ease; z-index: 90; }
         .backdrop.active { opacity: 1; visibility: visible; }
@@ -85,15 +90,18 @@
         .guideModal h2 { text-align: center; color: var(--main); font-size: 2.2rem; margin-bottom: 1.5rem; font-weight: bold; }
         .guideFormGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .guideFormLeft, .guideFormRight { display: flex; flex-direction: column; gap: 1.2rem; }
+        
         .formGroup { display: flex; flex-direction: column; gap: 0.4rem; }
         .formGroup label { font-weight: bold; color: var(--text1); font-size: 0.95rem; }
         .formGroup input[type="text"], .formGroup textarea, .formGroup input[type="file"] { width: 100%; padding: 0.75rem; border: 1px solid var(--outline); border-radius: 4px; font-size: 1rem; outline: none; }
         .formGroup textarea { resize: vertical; min-height: 110px; }
+
         .stepsContainer { display: flex; flex-direction: column; gap: 0.6rem; max-height: 320px; min-height: 320px; overflow-y: auto; background-color: #f5f5f5; padding: 1rem; border-radius: 4px; }
         .stepItem { display: flex; gap: 0.5rem; align-items: center; }
         .stepItem input { flex: 1; padding: 0.6rem; border: 1px solid var(--outline); border-radius: 4px; font-size: 1rem; }
         .stepItem .btnRemoveStep { background-color: var(--danger); color: white; border: none; padding: 0.6rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 1.1rem; }
         .btnAddStep { background-color: var(--main); color: white; border: none; padding: 0.75rem; border-radius: 4px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; margin-top: 0.5rem; }
+        
         .modalActions { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; }
         .modalActions button { padding: 0.75rem 2rem; font-size: 1.1rem; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; }
         .modalActions .btnSubmitGuide { background-color: var(--main); color: white; }

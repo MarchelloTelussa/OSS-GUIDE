@@ -1,10 +1,13 @@
-// lib/session.js
-import crypto from 'crypto';
-import db from '../db.js';
-import cron from 'node-cron';
+import jwt from 'jsonwebtoken';
+
+// Ambil secret dari environment variables
+const JWT_SECRET = process.env.JWT_SECRET || 'ganti_dengan_secret_key_yang_sangat_rahasia_dan_panjang';
 export const COOKIE_NAME = 'oss_session';
 const MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 jam
 
+/**
+ * Konfigurasi HTTP-Only Cookie
+ */
 export const cookieOptions = () => ({
     httpOnly: true,
     sameSite: 'lax',
@@ -12,41 +15,16 @@ export const cookieOptions = () => ({
     maxAge: MAX_AGE_MS,
 });
 
-// 1. Buat Sesi Baru di Database & Kembalikan Session ID
-export async function createSession(userId) {
-    const sessionId = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + MAX_AGE_MS);
-
-    await db.query(
-        'INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)',
-        [sessionId, userId, expiresAt]
-    );
-
-    return sessionId;
+/**
+ * 1. Membuat Token JWT Baru
+ */
+export function generateToken(payload) {
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
 }
 
-// 2. Baca Sesi dari Database & Ambil Data User-nya
-export async function readSession(sessionId) {
-    if (!sessionId) return null;
-
-    const queryText = `
-        SELECT u.id, u.username, u.role, s.expires_at
-        FROM sessions s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.id = $1 AND s.expires_at > NOW();
-    `;
-
-    const { rows } = await db.query(queryText, [sessionId]);
-    return rows[0] || null;
-}
-
-// 3. Hapus Sesi dari Database saat Logout
-export async function destroySession(sessionId) {
-    if (!sessionId) return;
-    await db.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
-}
-
-// 4. Helper Parser Cookie
+/**
+ * 2. Helper Parser Cookie
+ */
 function parseCookies(header = '') {
     return Object.fromEntries(
         header.split(';').map((c) => c.trim()).filter(Boolean).map((c) => {
@@ -56,31 +34,44 @@ function parseCookies(header = '') {
     );
 }
 
-export async function sessionMiddleware(req, res, next) {
+/**
+ * 3. Middleware Pasif untuk Dekode & Verifikasi JWT
+ */
+export function sessionMiddleware(req, res, next) {
     try {
         const cookies = parseCookies(req.headers.cookie);
-        const sessionId = cookies[COOKIE_NAME];
+        const token = cookies[COOKIE_NAME];
 
-        if (sessionId) {
-            req.sessionId = sessionId;
-            req.user = await readSession(sessionId);
+        if (token) {
+            // Verifikasi signature JWT
+            const decoded = jwt.verify(token, JWT_SECRET);
+            
+            // Rekonstruksi req.user persis seperti struktur lama
+            req.user = {
+                id: decoded.id,
+                username: decoded.username,
+                role: decoded.role
+            };
         } else {
             req.user = null;
         }
 
         next();
     } catch (error) {
-        // Oper error database ke errorHandler terpusat
-        next(error);
+        // Jika token invalid/expired, anggap unauthenticated tanpa bikin server crash
+        req.user = null;
+        next();
     }
 }
 
-// 6. Auth Protection Guard
+/**
+ * 4. Auth Protection Guard (Sama persis dengan versi lama)
+ */
 export function requireAuth(role) {
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ 
-                error: 'Sesi Anda telah berakhir atau diakhiri karena login di perangkat lain.',
+                error: 'Sesi Anda telah berakhir atau token tidak valid.',
                 code: 'SESSION_TERMINATED'
             });
         }
@@ -90,39 +81,3 @@ export function requireAuth(role) {
         next();
     };
 }
-
-// 7. Hapus Seluruh Sesi Lama User
-export async function destroyAllUserSessions(userId) {
-    if (!userId) return;
-    
-    const cleanUserId = parseInt(userId, 10);
-    const result = await db.query('DELETE FROM sessions WHERE user_id = $1', [cleanUserId]);
-    console.log(`[DEBUG] Menghapus ${result.rowCount} sesi lama milik user_id: ${cleanUserId}`);
-}
-
-/**
- * Memulai job cron untuk menghapus sesi yang kadaluwarsa setiap 1 jam.
- */
-export function startExpiredSessionCleanupJob() {
-    // String cron '0 * * * *' artinya: menit ke-0 pada setiap jam
-    const job = cron.schedule('0 * * * *', async () => {
-        try {
-            const result = await db.query('DELETE FROM sessions WHERE expires_at < NOW()');
-            console.log(`[CRON] Pembersihan sesi expired selesai. Menghapus ${result.rowCount || 0} sesi.`);
-        } catch (err) {
-            console.error('[CRON ERROR] Gagal menghapus sesi expired:', err);
-        }
-    });
-
-    console.log('[CRON] Scheduled job: Hapus sesi expired (setiap 1 jam) berhasil diaktifkan.');
-    return job;
-}
-
-// Cleanup otomatis background task
-setInterval(async () => {
-    try {
-        await db.query('DELETE FROM sessions WHERE expires_at < NOW()');
-    } catch (err) {
-        console.error('[CLEANUP ERROR] Gagal membersihkan sesi kedaluwarsa:', err.message);
-    }
-}, 60 * 60 * 1000);

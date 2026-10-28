@@ -1,4 +1,5 @@
 import { CustomDialog } from './dialog.js';
+import { initAuth, hasRole, getCurrentUser } from './auth-state.js';
 
 // State Management
 const state = {
@@ -30,21 +31,27 @@ let guideModal, guideModalTitle, guideForm, guideIdInput, guideTitleInput,
 /**
  * Inisialisasi Halaman
  */
-async function init() {
-    await checkUserAuth();
-    setupGlobalEvents();
+    async function init() {
+        await initAuth(); // Inject DOM admin terlebih dahulu
 
-    const urlParams = new URLSearchParams(window.location.search);
-    state.groupId = urlParams.get('groupId');
+        state.currentUser = getCurrentUser();
 
-    if (state.groupId) {
-        await fetchGroupDetails(state.groupId);
-    } else {
-        await fetchAllGuides();
+        if (hasRole('ITAdmin')) {
+            injectGuideAdminModal();
+        }
+        setupGlobalEvents();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        state.groupId = urlParams.get('groupId');
+
+        if (state.groupId) {
+            await fetchGroupDetails(state.groupId);
+        } else {
+            await fetchAllGuides();
+        }
+
+        renderListView();
     }
-
-    renderListView();
-}
 
 /**
  * Helper untuk menampilkan toast notification
@@ -95,24 +102,6 @@ async function fetchGroupDetails(groupId) {
         state.group = null;
         state.type = null;
         state.guides = [];
-    }
-}
-
-/**
- * Verifikasi User & Inject Modal Admin untuk ITAdmin
- */
-async function checkUserAuth() {
-    try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-            state.currentUser = await response.json();
-        }
-    } catch (err) {
-        console.warn('Auth check failed:', err);
-    }
-
-    if (state.currentUser && state.currentUser.role === 'ITAdmin') {
-        injectGuideAdminModal();
     }
 }
 

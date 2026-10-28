@@ -1,15 +1,20 @@
 import { CustomDialog } from './dialog.js';
 
-// Mengisi navbar sesuai user yang login: nama, tombol logout, dan menu Add Guide (khusus ITAdmin)
-const userLink = document.getElementById('user');
-const manageTypeButton = document.querySelector('#bttnManage');
+// State privat
+let currentUser = null;
 
-export async function getUserInfo() {
+// Element DOM
+const userLink = document.getElementById('user');
+
+/**
+ * Dipanggil 1x saat aplikasi dimuat.
+ * Bertanggung jawab mengambil data user, redirect jika tidak valid, dan update UI navbar.
+ */
+export async function initAuth() {
     try {
         const response = await fetch('/api/auth/me');
 
         if (!response.ok) {
-            // Jika status 401 (sesi hangus/di-kick), lempar URL dengan query parameter
             if (response.status === 401) {
                 window.location.href = 'login.html?reason=kicked';
                 return null;
@@ -18,26 +23,39 @@ export async function getUserInfo() {
             return null;
         }
 
-        const user = await response.json();
+        currentUser = await response.json();
 
+        // Update UI Navbar khusus user
         if (userLink) {
-            userLink.querySelector('i').textContent = ` ${user.username}`;
+            const icon = userLink.querySelector('i');
+            if (icon) icon.textContent = ` ${currentUser.username}`;
             userLink.title = 'Klik untuk logout';
         }
 
-        if (manageTypeButton && user.role !== 'ITAdmin') {
-            const button = manageTypeButton.closest('button');
-            if (button) button.remove();
-            else manageTypeButton.remove();
-        }
-        return user;
+
+        return currentUser;
     } catch (err) {
-        // Fallback jika terjadi Network Error / Server Down
+        console.error('Auth check failed:', err);
         window.location.href = 'login.html';
         return null;
     }
 }
 
+/**
+ * Helper untuk mengambil data pengguna yang aktif tanpa perlu fetch ulang
+ */
+export function getCurrentUser() {
+    return currentUser;
+}
+
+/**
+ * Helper untuk cek apakah user memiliki role tertentu
+ */
+export function hasRole(requiredRole) {
+    return currentUser !== null && currentUser.role === requiredRole;
+}
+
+// Handler event listener Logout
 if (userLink) {
     userLink.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -63,5 +81,3 @@ if (userLink) {
         }
     });
 }
-
-getUserInfo();

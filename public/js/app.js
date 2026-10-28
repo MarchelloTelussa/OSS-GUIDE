@@ -1,4 +1,5 @@
 import { CustomDialog } from './dialog.js';
+import { initAuth, hasRole, getCurrentUser } from './auth-state.js';
 
 // State Management
 const state = {
@@ -23,30 +24,18 @@ let elements = {};
  * Initialize Dashboard & Authenticate User
  */
 async function init() {
-    await checkUserAuth(); // Inject DOM admin terlebih dahulu
+    await initAuth(); // Inject DOM admin terlebih dahulu
+
+    state.currentUser = getCurrentUser();
+
+    if (hasRole('ITAdmin')) {
+        injectAdminDOM();
+    }
     cacheDOMElements();     // Cache elemen DOM setelah elemen admin ter-inject
     setupEventListeners(); // Pasang event listeners pada seluruh elemen
     await fetchAndRenderTypes();
 }
 
-/**
- * Cek Autentikasi User & Inject Modal Admin jika ITAdmin
- */
-async function checkUserAuth() {
-    try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-            state.currentUser = await response.json();
-        }
-    } catch (err) {
-        console.warn('Auth check failed:', err);
-    }
-
-    // Hanya jika role == 'ITAdmin', suntikkan elemen DOM khusus admin
-    if (state.currentUser && state.currentUser.role === 'ITAdmin') {
-        injectAdminDOM();
-    }
-}
 
 /**
  * Injeksi elemen HTML khusus Admin ke dalam DOM

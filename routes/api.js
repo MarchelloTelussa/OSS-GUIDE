@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/session.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logActivity, getActivityLogs } from '../middleware/logger.js';
 
 const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -57,12 +58,10 @@ function cleanupFileAndParentDir(relPath) {
         if (fs.existsSync(absolutePath)) {
             fs.unlinkSync(absolutePath);
 
-            // Hapus folder parent (misal folder guide) jika kosong
             const parentDir = path.dirname(absolutePath);
             if (fs.existsSync(parentDir) && fs.readdirSync(parentDir).length === 0) {
                 fs.rmdirSync(parentDir);
 
-                // Hapus folder grandparent (misal folder type) jika kosong
                 const grandParentDir = path.dirname(parentDir);
                 if (fs.existsSync(grandParentDir) && fs.readdirSync(grandParentDir).length === 0) {
                     fs.rmdirSync(grandParentDir);
@@ -78,7 +77,7 @@ function cleanupFileAndParentDir(relPath) {
 // 1. TYPE ROUTES (CRUD)
 // =============================================================
 
-// GET all types (termasuk field parent_slug / parentSlug)
+// GET all types
 router.get('/types', async (req, res, next) => {
     try {
         const queryText = `
@@ -93,7 +92,7 @@ router.get('/types', async (req, res, next) => {
     }
 });
 
-// GET single type by ID (termasuk parentSlug & nested groups)
+// GET single type by ID
 router.get('/types/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
@@ -142,7 +141,6 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
         const trimmedTitle = title.trim();
         const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
 
-        // Cek Duplikasi Nama Type
         const checkDuplicate = await db.query(
             `SELECT id FROM type 
             WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '')`,
@@ -164,14 +162,14 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
             description || '', 
             imgUrl || ''
         ]);
-
+        await logActivity(req, `Create Type baru: ${rows[0].title} (ID: ${rows[0].id})`);
         res.status(201).json(rows[0]);
     } catch (error) {
         next(error);
     }
 });
 
-// PUT update type (ITAdmin only + Auto-Rename Folder & Path Sync)
+// PUT update type (ITAdmin only)
 router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const { parentSlug, title, description, imgUrl } = req.body;
@@ -183,7 +181,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const newTitle = title.trim();
     const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
 
-    // Cek Duplikasi Nama Type (abaikan ID yang sedang di-edit)
     const checkDuplicate = await db.query(
         `SELECT id FROM type 
         WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
@@ -199,7 +196,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Ambil data lama sebelum di-update
         const oldTypeRes = await client.query('SELECT title, image_url FROM type WHERE id = $1', [id]);
         if (oldTypeRes.rows.length === 0) {
             await client.query('ROLLBACK');
@@ -208,15 +204,12 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         const oldTitle = oldTypeRes.rows[0].title;
 
-        // 2. Sanitasi nama folder lama dan baru
         const oldSafeFolder = oldTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
         const newSafeFolder = newTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
 
         let finalImgUrl = imgUrl || '';
 
-        // 3. Jika nama Type berubah, ubah nama folder fisik di server
         if (oldSafeFolder !== newSafeFolder) {
-            // A. Rename Folder Gambar (/public/img/{old} -> /public/img/{new})
             const oldImgDir = path.join(__dirname, '../public/img', oldSafeFolder);
             const newImgDir = path.join(__dirname, '../public/img', newSafeFolder);
 
@@ -227,12 +220,10 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
                 fs.renameSync(oldImgDir, newImgDir);
             }
 
-            // Update path image_url jika gambar masih menggunakan folder lama
             if (finalImgUrl && finalImgUrl.includes(`/img/${oldSafeFolder}/`)) {
                 finalImgUrl = finalImgUrl.replace(`/img/${oldSafeFolder}/`, `/img/${newSafeFolder}/`);
             }
 
-            // B. Rename Folder Video (/public/videos/{old} -> /public/videos/{new})
             const oldVideoDir = path.join(__dirname, '../public/videos', oldSafeFolder);
             const newVideoDir = path.join(__dirname, '../public/videos', newSafeFolder);
 
@@ -243,7 +234,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
                 fs.renameSync(oldVideoDir, newVideoDir);
             }
 
-            // C. Sync seluruh video_url di tabel 'guide' yang terikat dengan Type ini
             const updateGuideVideosQuery = `
                 UPDATE guide
                 SET video_url = REPLACE(video_url, $1, $2)
@@ -262,7 +252,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             ]);
         }
 
-        // 4. Update tabel Type di Database
         const updateTypeQuery = `
             UPDATE type
             SET parent_slug = $1, title = $2, description = $3, image_url = $4
@@ -279,8 +268,8 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('COMMIT');
 
+        await logActivity(req, `Update Type: "${oldTitle}" menjadi "${rows[0].title}" (ID: ${rows[0].id})`);
         res.json(rows[0]);
-
     } catch (error) {
         await client.query('ROLLBACK');
         next(error);
@@ -289,7 +278,7 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// DELETE type (ITAdmin only + File & Folder Cleanup)
+// DELETE type (ITAdmin only)
 router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     try {
@@ -322,6 +311,7 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         if (fs.existsSync(imgTypeDir)) fs.rmSync(imgTypeDir, { recursive: true, force: true });
         if (fs.existsSync(videoTypeDir)) fs.rmSync(videoTypeDir, { recursive: true, force: true });
 
+        await logActivity(req, `Delete Type: "${title}" (ID: ${id})`);
         res.json({ message: 'Type successfully deleted', deletedId: id });
     } catch (error) {
         next(error);
@@ -332,8 +322,6 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // 2. GUIDE GROUPS ROUTES (CRUD)
 // =============================================================
 
-// GET all guide groups (optional filter by ?typeId=)
-// GET /groups?typeId=...
 router.get('/groups', async (req, res, next) => {
     const { typeId } = req.query;
     try {
@@ -373,7 +361,6 @@ router.get('/groups', async (req, res, next) => {
     }
 });
 
-// GET single guide group by ID (with nested type & guides list)
 router.get('/groups/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
@@ -416,12 +403,11 @@ router.get('/groups/:id', async (req, res, next) => {
 
         res.json(rows[0]);
     } catch (error) {
-        console.error('Error on GET /groups/:id:', error); // Log error asli ke terminal Node.js
+        console.error('Error on GET /groups/:id:', error);
         next(error);
     }
 });
 
-// PUT update group
 router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const { typeId, title, description, groupOrder } = req.body;
@@ -431,6 +417,9 @@ router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 
     try {
+        const oldGroupRes = await db.query('SELECT title FROM guide_groups WHERE id = $1', [id]);
+        const oldTitle = oldGroupRes.rows.length > 0 ? oldGroupRes.rows[0].title : '';
+
         const queryText = `
             UPDATE guide_groups
             SET type_id = $1, title = $2, description = $3, group_order = $4
@@ -443,14 +432,18 @@ router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             return res.status(404).json({ error: 'Guide Group tidak ditemukan.' });
         }
 
+        if (oldTitle && oldTitle !== rows[0].title) {
+            await logActivity(req, `Update Group: "${oldTitle}" menjadi "${rows[0].title}" (ID: ${rows[0].id})`);
+        } else {
+            await logActivity(req, `Update Group: "${rows[0].title}" (ID: ${rows[0].id})`);
+        }
+
         res.json(rows[0]);
     } catch (error) {
-        // Tangani error DB dan kembalikan JSON
-        res.status(500).json({ error: error.message || 'Terjadi kesalahan pada server.' });
+        next(error);
     }
 });
 
-// POST create guide group (ITAdmin only)
 router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const { typeId, title, description, groupOrder } = req.body;
@@ -470,21 +463,21 @@ router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
             description || '',
             groupOrder || 0
         ]);
-
+        
+        await logActivity(req, `Create Group baru: "${rows[0].title}" (ID: ${rows[0].id})`);
         res.status(201).json(rows[0]);
     } catch (error) {
         next(error);
     }
 });
 
-// DELETE guide group (ITAdmin only)
 router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     try {
         const queryText = `
             DELETE FROM guide_groups
             WHERE id = $1
-            RETURNING id;
+            RETURNING id, title;
         `;
         const { rows } = await db.query(queryText, [id]);
 
@@ -492,18 +485,17 @@ router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             return res.status(404).json({ error: 'Guide Group not found' });
         }
 
+        await logActivity(req, `Delete Group: "${rows[0].title}" (ID: ${rows[0].id})`);
         res.json({ message: 'Guide Group successfully deleted', deletedId: rows[0].id });
     } catch (error) {
         next(error);
     }
 });
 
-
 // =============================================================
 // 3. GUIDE ROUTES (CRUD)
 // =============================================================
 
-// GET all guides (optional filter by ?groupId=)
 router.get('/guides', async (req, res, next) => {
     const { groupId } = req.query;
     try {
@@ -534,7 +526,6 @@ router.get('/guides', async (req, res, next) => {
     }
 });
 
-// GET single guide by ID (with ordered steps)
 router.get('/guides/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
@@ -574,12 +565,11 @@ router.get('/guides/:id', async (req, res, next) => {
     }
 });
 
-// POST increment viewcount
 router.post('/guides/:id/view', async (req, res, next) => {
     const { id } = req.params;
     try {
         const result = await db.query(
-            'UPDATE guide SET viewcount = viewcount + 1 WHERE id = $1 RETURNING viewcount',
+            'UPDATE guide SET viewcount = viewcount + 1 WHERE id = $1 RETURNING viewcount, title',
             [id]
         );
 
@@ -587,13 +577,14 @@ router.post('/guides/:id/view', async (req, res, next) => {
             return res.status(404).json({ error: 'Guide not found' });
         }
 
+        await logActivity(req, `View Guide: "${result.rows[0].title}" (ID: ${id})`);
         res.json({ views: result.rows[0].viewcount });
     } catch (error) {
         next(error);
     }
 });
 
-// POST create guide (ITAdmin only)
+// POST create guide (PERBAIKAN: Deklarasikan trimmedTitle)
 router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     const client = await db.getClient();
     try {
@@ -602,6 +593,8 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
         if (!groupId || !title || !functionDesc) {
             return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
         }
+
+        const trimmedTitle = title.trim();
 
         await client.query('BEGIN');
 
@@ -612,7 +605,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         const guideResult = await client.query(guideQuery, [
             groupId,
-            title.trim(),
+            trimmedTitle,
             functionDesc,
             importantNote || '',
             videoUrl || ''
@@ -633,6 +626,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('COMMIT');
 
+        await logActivity(req, `Create Guide baru: "${trimmedTitle}" (ID: ${guideId})`);
         res.status(201).json({
             id: guideId,
             message: 'Guide created successfully'
@@ -645,7 +639,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// PUT update guide (ITAdmin only) g
+// PUT update guide (PERBAIKAN: Deklarasikan trimmedTitle & oldTitle)
 router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
@@ -662,33 +656,33 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
         }
 
+        const trimmedTitle = title.trim();
+
         await client.query('BEGIN');
 
-        // 1. Ambil data video_url lama dari database sebelum di-update
-        const oldGuideRes = await client.query('SELECT video_url FROM guide WHERE id = $1', [guideId]);
+        const oldGuideRes = await client.query('SELECT title, video_url FROM guide WHERE id = $1', [guideId]);
         if (oldGuideRes.rows.length === 0) {
             await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Guide tidak ditemukan' });
         }
+        const oldTitle = oldGuideRes.rows[0].title;
         const oldVideoUrl = oldGuideRes.rows[0].video_url;
 
-        // 2. Update data guide di database
         const updateGuideQuery = `
             UPDATE guide
             SET group_id = $1, title = $2, function_desc = $3, important_note = $4, video_url = $5
             WHERE id = $6
             RETURNING id;
         `;
-        const { rows } = await client.query(updateGuideQuery, [
+        await client.query(updateGuideQuery, [
             groupId,
-            title.trim(),
+            trimmedTitle,
             functionDesc,
             importantNote || '',
             videoUrl || '',
             guideId
         ]);
 
-        // 3. Replace steps
         await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
 
         if (Array.isArray(steps) && steps.length > 0) {
@@ -704,9 +698,14 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('COMMIT');
 
-        // 4. PEMBERSIHAN: Jika ada video baru dan videoUrl lama berbeda, hapus video lama dari server
         if (oldVideoUrl && videoUrl && oldVideoUrl !== videoUrl) {
             cleanupFileAndParentDir(oldVideoUrl);
+        }
+
+        if (oldTitle && oldTitle !== trimmedTitle) {
+            await logActivity(req, `Update Guide: "${oldTitle}" menjadi "${trimmedTitle}" (ID: ${guideId})`);
+        } else {
+            await logActivity(req, `Update Guide: "${trimmedTitle}" (ID: ${guideId})`);
         }
 
         res.json({ message: 'Guide updated successfully', id: guideId });
@@ -719,7 +718,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// DELETE guide (ITAdmin only + File & Folder Cleanup)
+// DELETE guide (PERBAIKAN: Ambil title pada RETURNING agar deletedTitle ada)
 router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
@@ -736,7 +735,7 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             const queryText = `
                 DELETE FROM guide
                 WHERE id = $1
-                RETURNING id, video_url AS "videoUrl";
+                RETURNING id, title, video_url AS "videoUrl";
             `;
             const { rows } = await client.query(queryText, [guideId]);
 
@@ -745,14 +744,16 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
                 return res.status(404).json({ error: 'Guide not found' });
             }
 
+            const deletedTitle = rows[0].title;
             const videoUrl = rows[0].videoUrl;
 
             await client.query('COMMIT');
 
-            // Hapus file video fisik beserta foldernya jika ada
             if (videoUrl) {
                 cleanupFileAndParentDir(videoUrl);
             }
+
+            await logActivity(req, `Delete Guide: "${deletedTitle}" (ID: ${guideId})`);
 
             res.json({
                 message: 'Guide deleted successfully',
@@ -772,7 +773,6 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // 4. FILE UPLOAD ROUTES (ITAdmin only)
 // =============================================================
 
-// Endpoint Upload Video: /public/videos/{typeName}/{guideTitle}/{filename}
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const chunks = [];
@@ -816,7 +816,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 let groupIdParam = null;
                 let titleParam = 'untitled';
 
-                // Parsing multipart form data secara manual
                 for (const part of parts) {
                     if (part.includes('name="groupId"')) {
                         const contentStart = part.indexOf('\r\n\r\n') + 4;
@@ -851,9 +850,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                     });
                 }
 
-                // -------------------------------------------------------------
-                // BUKTI LOGIKA: CARI NAMA TYPE DARI DATABASE BERDASARKAN groupId
-                // -------------------------------------------------------------
                 let typeNameFound = 'general';
                 if (groupIdParam) {
                     const typeQuery = `
@@ -868,11 +864,9 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                     }
                 }
 
-                // Sanitasi nama folder agar aman di sistem berkas (Linux/Windows)
                 const safeTypeFolder = typeNameFound.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
                 const safeTitleFolder = titleParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
                 
-                // Target: /public/videos/{typeName}/{guideTitle}
                 const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
                 if (!fs.existsSync(targetDir)) {
@@ -897,7 +891,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// Endpoint Upload Gambar: /public/img/{typeName}/{filename}
 router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const chunks = [];
@@ -989,6 +982,16 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
                 next(error);
             }
         });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GET /api/admin/logs (Khusus ITAdmin)
+router.get('/admin/logs', requireAuth('ITAdmin'), async (req, res, next) => {
+    try {
+        const logs = await getActivityLogs(100);
+        res.json(logs);
     } catch (error) {
         next(error);
     }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OSS-Guide</title>
+    <title>QuantumGuide</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,7 +55,26 @@
         
         .typeManageButton button {color: white; background: none; border: none; cursor: pointer; font-size: 1.25rem;}
 
-        .identityContainer {display: flex; flex-direction: row; width: 100%; height: calc(100% - 2.5rem); gap: 20px;}
+        .identityContainer { display: flex; flex-direction: row; width: 100%; height: calc(100% - 2.5rem); gap: 20px; }
+        #typeManageContainer { display: flex; align-items: center; gap: 0.5rem; }
+        #btnActivityLog { background: transparent; border: none; color: white; cursor: pointer; padding: 0.4rem; font-size: 1.1rem; }
+        #btnActivityLog:hover { color: var(--outline); }
+
+        .typeIdentity.activity-log-view { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; padding: 1.5rem; box-sizing: border-box; background: #ffffff; border-radius: 8px; border: 1px solid var(--outline); }
+
+        .logContainerHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.5rem; flex-shrink: 0; }
+        .logContainerHeader h2 { font-size: 1.3rem; color: var(--main); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+        .logListContent { flex: 1; overflow-y: auto; overflow-x: auto; width: 100%; }
+
+        .logTable { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        .logTable th, .logTable td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eeeeee; white-space: nowrap; }
+        .logTable th { background-color: #f8f9fa; color: var(--main); position: sticky; top: 0; z-index: 2; font-weight: bold; }
+
+        .badge-method { padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; color: #ffffff; }
+        .badge-method.GET { background-color: #28a745; }
+        .badge-method.POST { background-color: #007bff; }
+        .badge-method.PUT { background-color: #ffc107; color: #000000; }
+        .badge-method.DELETE { background-color: #dc3545; }
 
         .typeIdentity { display: flex; flex-direction: column; width: 75%; height: 100%; padding: 1rem 2rem; background-color: var(--second2); overflow-y: auto; }
         .typeIdentity.default-landing-center { display: flex; justify-content: center; align-items: center; width: 100%; text-align: center; padding: 2rem 1rem; }

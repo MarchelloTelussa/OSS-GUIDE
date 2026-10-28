@@ -52,10 +52,11 @@ async function checkUserAuth() {
  * Injeksi elemen HTML khusus Admin ke dalam DOM
  */
 function injectAdminDOM() {
-    // 1. Inject Tombol Manage Types
+    // 1. Inject Tombol Manage Types & Lonceng Log Aktivitas (Satu Kontainer)
     const typeManageContainer = document.getElementById('typeManageContainer');
     if (typeManageContainer) {
         typeManageContainer.innerHTML = `
+            <button id="btnActivityLog" title="Log Aktivitas Admin"><i class="fa-solid fa-bell fa-lg"></i></button>
             <button id="btnManage" title="Manage Types"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
         `;
     }
@@ -172,6 +173,7 @@ function cacheDOMElements() {
 
         // Admin Elements (Akan ada jika di-inject)
         btnManage: document.getElementById('btnManage'),
+        btnActivityLog: document.getElementById('btnActivityLog'),
         backdrop: document.getElementById('backdrop'),
         manageTypeModal: document.getElementById('manageTypeModal'),
         closeManageModal: document.getElementById('closeManageModal'),
@@ -226,6 +228,7 @@ function setupEventListeners() {
 
     // Event listener admin hanya diaktifkan jika elemen ter-inject
     if (elements.btnManage) elements.btnManage.addEventListener('click', openManageModal);
+    if (elements.btnActivityLog) elements.btnActivityLog.addEventListener('click', renderActivityLogView);
     if (elements.closeManageModal) elements.closeManageModal.addEventListener('click', closeAllModals);
     if (elements.closeEditModal) elements.closeEditModal.addEventListener('click', closeAllModals);
     if (elements.backdrop) elements.backdrop.addEventListener('click', closeAllModals);
@@ -237,7 +240,6 @@ function setupEventListeners() {
         });
     }
 
-    // --- TAMBAHAN: Listener saat dropdown parent di modal manage type berubah ---
     if (elements.newTypeParentSelect) {
         elements.newTypeParentSelect.addEventListener('change', () => {
             renderManageTypeList();
@@ -285,6 +287,80 @@ function renderDefaultView() {
     if (elements.guideGroupContainer) {
         elements.guideGroupContainer.innerHTML = '';
         elements.guideGroupContainer.style.display = 'none';
+    }
+}
+
+/**
+ * Render Tampilan Log Aktivitas saat Lonceng diklik
+ */
+async function renderActivityLogView() {
+    state.selectedTypeId = null;
+    renderTypeTabs();
+
+    if (elements.guideGroupContainer) {
+        elements.guideGroupContainer.innerHTML = '';
+        elements.guideGroupContainer.style.display = 'none';
+    }
+
+    if (!elements.typeIdentityContainer) return;
+
+    elements.typeIdentityContainer.className = 'typeIdentity activity-log-view';
+    elements.typeIdentityContainer.innerHTML = `
+        <div class="logContainerHeader">
+            <h2><i class="fa-solid fa-bell"></i> Log Aktivitas Sistem</h2>
+            <button id="btnCloseLogView" class="closeModalBtn" title="Tutup Log">&times;</button>
+        </div>
+        <div id="logListContent" class="logListContent">
+            <p style="text-align: center; color: var(--text2);">Memuat data log...</p>
+        </div>
+    `;
+
+    document.getElementById('btnCloseLogView')?.addEventListener('click', renderDefaultView);
+
+    try {
+        const response = await fetch(`${API_BASE}/admin/logs`);
+        if (!response.ok) throw new Error('Gagal mengambil data log');
+
+        const logs = await response.json();
+        const logContent = document.getElementById('logListContent');
+
+        if (!logContent) return;
+
+        if (logs.length === 0) {
+            logContent.innerHTML = '<p style="text-align: center; padding: 1rem;">Belum ada riwayat aktivitas.</p>';
+            return;
+        }
+
+        logContent.innerHTML = `
+            <table class="logTable">
+                <thead>
+                    <tr>
+                        <th>Waktu</th>
+                        <th>User / Role</th>
+                        <th>Aksi</th>
+                        <th>Method</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${logs.map(log => `
+                        <tr>
+                            <td>${new Date(log.createdAt).toLocaleString('id-ID')}</td>
+                            <td><strong>${escapeHTML(log.userName || 'Guest')}</strong> (${escapeHTML(log.userRole || '-')})</td>
+                            <td>${escapeHTML(log.action)}</td>
+                            <td><span class="badge-method ${log.method}">${log.method}</span></td>
+                            <td>${escapeHTML(log.ipAddress || '-')}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Error loading activity logs:', error);
+        const logContent = document.getElementById('logListContent');
+        if (logContent) {
+            logContent.innerHTML = '<p style="text-align: center; color: var(--danger); padding: 1rem;">Gagal memuat log aktivitas.</p>';
+        }
     }
 }
 
@@ -347,10 +423,8 @@ async function fetchAndRenderTypes() {
 }
 
 function renderTypeTabs() {
-    // 1. Langsung bersihkan isi dari elements.typesContainer (id="types")
     elements.typesContainer.innerHTML = '';
 
-    // 2. Render masing-masing parent dropdown langsung ke typesContainer
     state.typeParents.forEach(parent => {
         const dropdown = document.createElement('div');
         dropdown.className = 'typeDropdown';
@@ -375,7 +449,6 @@ function renderTypeTabs() {
             </div>
         `;
 
-        // Event listener untuk klik item type
         dropdown.querySelectorAll('.dropdownItem[data-id]').forEach(item => {
             item.addEventListener('click', (e) => {
                 const typeId = parseInt(e.target.dataset.id, 10);
@@ -385,24 +458,21 @@ function renderTypeTabs() {
             });
         });
 
-        // Masukkan dropdown langsung ke #types tanpa pembungkus typeGroup baru
         elements.typesContainer.appendChild(dropdown);
     });
 }
 
 /**
- * Select Type (Updated)
+ * Select Type
  */
 async function selectType(typeId) {
     state.selectedTypeId = typeId;
     renderTypeTabs();
 
-    // Tampilkan kembali guideGroupContainer
     if (elements.guideGroupContainer) {
         elements.guideGroupContainer.style.display = '';
     }
 
-    // Kembalikan struktur DOM asli sebelum merender data type
     restoreTypeIdentityDOM();
 
     try {
@@ -482,8 +552,6 @@ function renderGuideGroups(groups) {
             <div class="searchContainer" style="position: relative;">
                 <input id="searchBar" type="text" placeholder="Cari guide..." autocomplete="off">
                 <button id="searchBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
-                
-                <!-- Container untuk rekomendasi dropdown -->
                 <div id="searchSuggestions" class="search-suggestions-dropdown" style="display: none;"></div>
             </div>
         </div>
@@ -515,8 +583,6 @@ function renderGuideGroups(groups) {
     }
 
     renderList(groups);
-
-    // Event Listener Search & Auto-complete
     setupSearchSuggestions(groups);
 
     if (isAdmin) {
@@ -546,10 +612,7 @@ function renderManageTypeList() {
     if (!elements.typeListManage) return;
     elements.typeListManage.innerHTML = '';
 
-    // Ambil parentSlug yang sedang dipilih di dropdown (misal: 'web' atau 'mobile')
     const selectedParentSlug = elements.newTypeParentSelect ? elements.newTypeParentSelect.value : 'web';
-
-    // Filter type berdasarkan parentSlug yang aktif
     const filteredTypes = state.types.filter(type => type.parentSlug === selectedParentSlug);
 
     if (filteredTypes.length === 0) {
@@ -589,7 +652,6 @@ async function handleCreateType() {
     }
 
     const normalizedInput = title.toLowerCase().replace(/\s+/g, '');
-
     const isDuplicate = state.types.some(type => {
         const normalizedExisting = type.title.trim().toLowerCase().replace(/\s+/g, '');
         return normalizedExisting === normalizedInput;
@@ -642,7 +704,6 @@ function openEditTypeModal(type) {
     elements.editTypeTitle.dataset.originalTitle = type.title;
     elements.editTypeDesc.value = type.description || '';
     
-    // ISIKAN VALUE SELECT DENGAN parentSlug MILIK TYPE:
     if (elements.editTypeParentSelect) {
         elements.editTypeParentSelect.value = type.parentSlug || 'web';
     }
@@ -679,7 +740,6 @@ async function handleUpdateType(e) {
     }
 
     const normalizedInput = title.toLowerCase().replace(/\s+/g, '');
-
     const isDuplicate = state.types.some(type => {
         if (type.id === parseInt(id, 10)) return false;
         const normalizedExisting = type.title.trim().toLowerCase().replace(/\s+/g, '');
@@ -983,11 +1043,9 @@ function handleSearch() {
     }
 
     const filteredGroups = state.groups.filter(group => {
-        // 1. Cek pada Group (Title & Description)
         const matchGroup = group.title.toLowerCase().includes(query) || 
                            (group.description && group.description.toLowerCase().includes(query));
 
-        // 2. Cek pada anak Guides (Title & Function Desc)
         const matchGuide = group.guides && group.guides.some(guide => 
             guide.title.toLowerCase().includes(query) ||
             (guide.functionDesc && guide.functionDesc.toLowerCase().includes(query))
@@ -999,9 +1057,6 @@ function handleSearch() {
     renderGuideGroups(filteredGroups);
 }
 
-/**
- * Helper untuk menandai item dropdown yang aktif via Navigasi Keyboard
- */
 function updateActiveSuggestion(items, selectedIndex) {
     items.forEach((item, index) => {
         if (index === selectedIndex) {
@@ -1013,21 +1068,6 @@ function updateActiveSuggestion(items, selectedIndex) {
     });
 }
 
-/**
- * Helper untuk eksekusi seleksi Guide Group dari dropdown pencarian
- */
-function selectSuggestion(groupId, groups, searchBar, suggestionsBox) {
-    const selectedGroup = groups.find(g => g.id == groupId);
-    if (selectedGroup) {
-        searchBar.value = '';
-        suggestionsBox.style.display = 'none';
-        handleGuideGroupClick(selectedGroup);
-    }
-}
-
-/**
- * Helper untuk menampilkan toast notification
- */
 function showToast(message) {
     let container = document.querySelector('.toast-container');
     if (!container) {
@@ -1042,10 +1082,7 @@ function showToast(message) {
 
     container.appendChild(toast);
 
-    // Trigger animasi masuk
     setTimeout(() => toast.classList.add('show'), 10);
-
-    // Hapus toast setelah 3 detik
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -1075,7 +1112,6 @@ function setupSearchSuggestions(groups) {
         const matches = [];
 
         groups.forEach(group => {
-            // A. Cek kecocokan di level Group
             if (group.title.toLowerCase().includes(query) || 
                (group.description && group.description.toLowerCase().includes(query))) {
                 matches.push({
@@ -1087,7 +1123,6 @@ function setupSearchSuggestions(groups) {
                 });
             }
 
-            // B. Cek kecocokan di level Guide milik Group ini
             if (group.guides && Array.isArray(group.guides)) {
                 group.guides.forEach(guide => {
                     const matchTitle = guide.title.toLowerCase().includes(query);
@@ -1113,7 +1148,6 @@ function setupSearchSuggestions(groups) {
             return;
         }
 
-        // Render rekomendasi dengan format `Group : Guide`
         suggestionsBox.innerHTML = matches.map((item, index) => `
             <div class="suggestion-item" 
                  data-type="${item.type}" 
@@ -1127,7 +1161,6 @@ function setupSearchSuggestions(groups) {
 
         suggestionsBox.style.display = 'block';
 
-        // Handler saat item dropdown diklik
         suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
                 const targetType = item.dataset.type;
@@ -1138,10 +1171,8 @@ function setupSearchSuggestions(groups) {
                 suggestionsBox.style.display = 'none';
 
                 if (targetType === 'guide') {
-                    // Navigasi langsung ke halaman guide dengan parameter groupId & guideId
                     window.location.href = `guide.html?groupId=${targetGroupId}&guideId=${targetId}`;
                 } else {
-                    // Navigasi ke halaman group
                     window.location.href = `guide.html?groupId=${targetGroupId}`;
                 }
             });

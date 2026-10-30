@@ -31,27 +31,36 @@ let guideModal, guideModalTitle, guideForm, guideIdInput, guideTitleInput,
 /**
  * Inisialisasi Halaman
  */
-    async function init() {
-        await initAuth(); // Inject DOM admin terlebih dahulu
+    /**
+ * Inisialisasi Halaman
+ */
+async function init() {
+    await initAuth(); // Inject DOM admin terlebih dahulu
 
-        state.currentUser = getCurrentUser();
+    state.currentUser = getCurrentUser();
 
-        if (hasRole('ITAdmin')) {
-            injectGuideAdminModal();
-        }
-        setupGlobalEvents();
+    if (hasRole('ITAdmin')) {
+        injectGuideAdminModal();
+    }
+    setupGlobalEvents();
 
-        const urlParams = new URLSearchParams(window.location.search);
-        state.groupId = urlParams.get('groupId');
+    const urlParams = new URLSearchParams(window.location.search);
+    state.groupId = urlParams.get('groupId');
+    const guideId = urlParams.get('guideId'); // 1. Ambil guideId dari URL
 
-        if (state.groupId) {
-            await fetchGroupDetails(state.groupId);
-        } else {
-            await fetchAllGuides();
-        }
+    if (state.groupId) {
+        await fetchGroupDetails(state.groupId);
+    } else {
+        await fetchAllGuides();
+    }
 
+    // 2. Jika guideId tersedia, langsung buka mode detail (video)
+    if (guideId) {
+        await openGuideDetail(guideId);
+    } else {
         renderListView();
     }
+}
 
 /**
  * Helper untuk menampilkan toast notification
@@ -322,6 +331,9 @@ async function openGuideDetail(id) {
 /**
  * RENDER MODE 2: Detail Mode (Video Player)
  */
+/**
+ * RENDER MODE 2: Detail Mode (Video Player)
+ */
 function renderDetailView() {
     const guide = state.currentGuide;
     const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
@@ -351,7 +363,22 @@ function renderDetailView() {
         </main>
     `;
 
-    document.getElementById('btnBackToList').addEventListener('click', () => {
+    document.getElementById('btnBackToList').addEventListener('click', async () => {
+        // Jika state.guides belum terisi (misal akibat akses langsung lewat URL guideId), 
+        // fetch ulang data group agar list view dapat ditampilkan dengan benar.
+        if (!state.guides || state.guides.length === 0) {
+            if (state.groupId) {
+                await fetchGroupDetails(state.groupId);
+            } else {
+                await fetchAllGuides();
+            }
+        }
+        
+        // Bersihkan query param guideId di URL tanpa mereload halaman
+        const url = new URL(window.location);
+        url.searchParams.delete('guideId');
+        window.history.replaceState({}, '', url);
+
         renderListView();
     });
 

@@ -1183,8 +1183,13 @@ function setupSearchSuggestions(groups) {
                 searchBar.value = '';
                 suggestionsBox.style.display = 'none';
 
+                // --- LOGIKA NAVIGASI ---
                 if (targetType === 'guide') {
+                    // Opsi A: Jika berpindah halaman dengan query parameter
                     window.location.href = `guide.html?groupId=${targetGroupId}&guideId=${targetId}`;
+                    
+                    // Opsi B: Jika SPA (Single Page Application), panggil fungsi render langsung:
+                    // renderSpecificGuide(targetGroupId, targetId);
                 } else {
                     window.location.href = `guide.html?groupId=${targetGroupId}`;
                 }
@@ -1193,9 +1198,31 @@ function setupSearchSuggestions(groups) {
     }
 
     function highlightMatch(text, query) {
-        const escapedText = escapeHTML(text);
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-        return escapedText.replace(regex, '<strong>$1</strong>');
+        if (!query) return escapeHTML(text);
+        
+        // Escape regex special characters
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, 'gi');
+        
+        // Split berdasarkan match agar bisa meng-escape teks non-match dan menyisipkan <strong>
+        const parts = text.split(regex);
+        return parts.map(part => {
+            if (part.toLowerCase() === query.toLowerCase()) {
+                return `<strong>${escapeHTML(part)}</strong>`;
+            }
+            return escapeHTML(part);
+        }).join('');
+    }
+
+    function updateActiveSuggestion(items, index) {
+        items.forEach((item, idx) => {
+            if (idx === index) {
+                item.classList.add('active');
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('active');
+            }
+        });
     }
 
     searchBar.addEventListener('input', showSuggestions);
@@ -1225,7 +1252,7 @@ function setupSearchSuggestions(groups) {
             } else {
                 suggestionsBox.style.display = 'none';
                 selectedIndex = -1;
-                handleSearch();
+                if (typeof handleSearch === 'function') handleSearch();
             }
 
         } else if (e.key === 'Escape') {
@@ -1244,7 +1271,7 @@ function setupSearchSuggestions(groups) {
     searchBtn?.addEventListener('click', () => {
         suggestionsBox.style.display = 'none';
         selectedIndex = -1;
-        handleSearch();
+        if (typeof handleSearch === 'function') handleSearch();
     });
 }
 

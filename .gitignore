@@ -5,6 +5,9 @@
 .env.test.local
 .env.production.local
 
+# script
+script/
+
 # Dependency directories
 node_modules/
 jspm_packages/

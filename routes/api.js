@@ -104,20 +104,22 @@ router.get('/types/:id', async (req, res, next) => {
                 t.description, 
                 t.image_url AS "imgUrl",
                 COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id', g.id,
-                            'title', g.title,
-                            'description', g.description,
-                            'groupOrder', g.group_order
-                        ) ORDER BY g.group_order ASC
-                    ) FILTER (WHERE g.id IS NOT NULL),
-                    '[]'
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id', g.id,
+                                'title', g.title,
+                                'description', g.description,
+                                'groupOrder', g.group_order
+                            ) ORDER BY g.group_order ASC
+                        )
+                        FROM guide_groups g
+                        WHERE g.type_id = t.id
+                    ),
+                    '[]'::json
                 ) AS groups
             FROM type t
-            LEFT JOIN guide_groups g ON t.id = g.type_id
-            WHERE t.id = $1
-            GROUP BY t.id;
+            WHERE t.id = $1;
         `;
         const { rows } = await db.query(queryText, [id]);
         if (rows.length === 0) {
@@ -371,29 +373,28 @@ router.get('/groups/:id', async (req, res, next) => {
                 gg.title,
                 gg.description,
                 gg.group_order AS "groupOrder",
-                
                 json_build_object(
                     'id', gt.id,
-                    'name', COALESCE(gt.title) 
+                    'name', gt.title
                 ) AS type,
-
                 COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'id', g.id,
-                            'title', g.title,
-                            'functionDesc', g.function_desc,
-                            'views', g.viewcount
-                        ) ORDER BY g.id ASC
-                    ) FILTER (WHERE g.id IS NOT NULL),
-                    '[]'
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id', g.id,
+                                'title', g.title,
+                                'functionDesc', g.function_desc,
+                                'views', g.viewcount
+                            ) ORDER BY g.id ASC
+                        )
+                        FROM guide g
+                        WHERE g.group_id = gg.id
+                    ),
+                    '[]'::json
                 ) AS guides
-
             FROM guide_groups gg
-            INNER JOIN type gt ON gg.type_id = gt.id 
-            LEFT JOIN guide g ON gg.id = g.group_id
-            WHERE gg.id = $1
-            GROUP BY gg.id, gg.type_id, gg.title, gg.description, gg.group_order, gt.id, gt.title;
+            INNER JOIN type gt ON gg.type_id = gt.id
+            WHERE gg.id = $1;
         `;
 
         const { rows } = await db.query(queryText, [id]);

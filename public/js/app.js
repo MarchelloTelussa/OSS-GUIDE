@@ -297,7 +297,16 @@ async function renderActivityLogView() {
     elements.typeIdentityContainer.innerHTML = `
         <div class="logContainerHeader">
             <h2><i class="fa-solid fa-bell"></i> Log Aktivitas Sistem</h2>
-            <button id="btnCloseLogView" class="closeModalBtn" title="Tutup Log">&times;</button>
+            <div class="logHeaderActions">
+                <select id="logMethodFilter" class="logFilterSelect">
+                    <option value="ALL">Semua Method</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+                <button id="btnCloseLogView" class="closeModalBtn" title="Tutup Log">&times;</button>
+            </div>
         </div>
         <div id="logListContent" class="logListContent">
             <p style="text-align: center; color: var(--text2);">Memuat data log...</p>
@@ -305,6 +314,21 @@ async function renderActivityLogView() {
     `;
 
     document.getElementById('btnCloseLogView')?.addEventListener('click', renderDefaultView);
+
+    // Event listener untuk filter method
+    document.getElementById('logMethodFilter')?.addEventListener('change', (e) => {
+        const selectedMethod = e.target.value;
+        const rows = document.querySelectorAll('.logTable tbody tr');
+        
+        rows.forEach(row => {
+            const rowMethod = row.getAttribute('data-method');
+            if (selectedMethod === 'ALL' || rowMethod === selectedMethod) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
 
     try {
         const response = await fetch(`${API_BASE}/admin/logs`);
@@ -333,7 +357,7 @@ async function renderActivityLogView() {
                 </thead>
                 <tbody>
                     ${logs.map(log => `
-                        <tr>
+                        <tr data-method="${log.method}">
                             <td>${new Date(log.createdAt).toLocaleString('id-ID')}</td>
                             <td><strong>${escapeHTML(log.userName || 'Guest')}</strong> (${escapeHTML(log.userRole || '-')})</td>
                             <td>${escapeHTML(log.action)}</td>

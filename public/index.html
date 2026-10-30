@@ -71,6 +71,10 @@
         .logTable th, .logTable td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eeeeee; white-space: nowrap; }
         .logTable th { background-color: #f8f9fa; color: var(--main); position: sticky; top: 0; z-index: 2; font-weight: bold; }
 
+        .logHeaderActions { display: flex; align-items: center; gap: 1rem; }
+        .logFilterSelect { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--outline, #ccc); background-color: #ffffff; color: var(--main, #333); font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color 0.2s; }
+        .logFilterSelect:focus { border-color: var(--main, #007bff); }
+
         .badge-method { padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; color: #ffffff; }
         .badge-method.GET { background-color: #28a745; }
         .badge-method.POST { background-color: #007bff; }

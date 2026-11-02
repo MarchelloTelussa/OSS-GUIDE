@@ -16,6 +16,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(sessionMiddleware);
+app.set('trust proxy', 1);
 
 const PUBLIC_PATHS = ['/login.html', '/js/login.js', '/api/auth/login', '/api/auth/logout'];
 

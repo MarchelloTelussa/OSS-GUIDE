@@ -44,8 +44,10 @@ router.post('/login', botDetector, loginRateLimiter, async (req, res, next) => {
             tokenVersion: newTokenVersion
         });
 
-        res.cookie(COOKIE_NAME, token, cookieOptions());
-        res.json({ username: user.username, role: user.role });
+        // FIX: Tambahkan (req) agar membaca header X-Forwarded-Proto dari Nginx
+        res.cookie(COOKIE_NAME, token, cookieOptions(req));
+        
+        return res.json({ username: user.username, role: user.role });
 
     } catch (error) {
         next(error);
@@ -54,9 +56,20 @@ router.post('/login', botDetector, loginRateLimiter, async (req, res, next) => {
 
 router.post('/logout', (req, res, next) => {
     try {
-        // Cukup bersihkan cookie tanpa menyentuh database
-        res.clearCookie(COOKIE_NAME, cookieOptions());
-        res.json({ message: 'Logged out' });
+        // Ambil opsi pembuatan cookie standar
+        const options = cookieOptions(req);
+        
+        // Hapus properti umur cookie agar tidak mengganggu proses penimpaan/penghapusan
+        delete options.maxAge;
+        delete options.expires;
+
+        // Pastikan path sesuai dengan saat cookie dibuat (default: '/')
+        options.path = '/';
+
+        // Clear cookie dari browser Client
+        res.clearCookie(COOKIE_NAME, options);
+        
+        return res.json({ message: 'Logged out' });
     } catch (error) {
         next(error);
     }

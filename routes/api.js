@@ -728,46 +728,55 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         return res.status(400).json({ error: 'Invalid ID' });
     }
 
-    enqueueTask(guideId, async () => {
-        const client = await db.getClient();
-        try {
-            await client.query('BEGIN');
+    try {
+        const result = await enqueueTask(guideId, async () => {
+            const client = await db.getClient();
+            try {
+                await client.query('BEGIN');
 
-            const queryText = `
-                DELETE FROM guide
-                WHERE id = $1
-                RETURNING id, title, video_url AS "videoUrl";
-            `;
-            const { rows } = await client.query(queryText, [guideId]);
+                const queryText = `
+                    DELETE FROM guide
+                    WHERE id = $1
+                    RETURNING id, title, video_url AS "videoUrl";
+                `;
+                const { rows } = await client.query(queryText, [guideId]);
 
-            if (rows.length === 0) {
+                if (rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    return null;
+                }
+
+                const deletedTitle = rows[0].title;
+                const videoUrl = rows[0].videoUrl;
+
+                await client.query('COMMIT');
+
+                if (videoUrl) {
+                    cleanupFileAndParentDir(videoUrl);
+                }
+
+                await logActivity(req, `Delete Guide: "${deletedTitle}" (ID: ${guideId})`);
+
+                return rows[0].id;
+            } catch (error) {
                 await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Guide not found' });
+                throw error;
+            } finally {
+                client.release();
             }
+        });
 
-            const deletedTitle = rows[0].title;
-            const videoUrl = rows[0].videoUrl;
-
-            await client.query('COMMIT');
-
-            if (videoUrl) {
-                cleanupFileAndParentDir(videoUrl);
-            }
-
-            await logActivity(req, `Delete Guide: "${deletedTitle}" (ID: ${guideId})`);
-
-            res.json({
-                message: 'Guide deleted successfully',
-                deletedId: rows[0].id
-            });
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
+        if (!result) {
+            return res.status(404).json({ error: 'Guide not found' });
         }
-    }).catch(next);
+
+        return res.json({
+            message: 'Guide deleted successfully',
+            deletedId: result
+        });
+    } catch (error) {
+        next(error);
+    }
 });
 
 // =============================================================

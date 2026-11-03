@@ -41,16 +41,16 @@ export const CustomDialog = {
                 <button id="btnAlertOk" class="btn-alert btn-alert-primary">${buttonText}</button>
             `;
 
-            const close = (result) => {
+            const cleanup = () => {
                 modal?.classList.remove('active');
                 backdrop?.classList.remove('active');
                 backdrop?.removeEventListener('click', onBackdropClick);
-                resolve(result);
             };
 
             const onBackdropClick = (e) => {
                 e.stopPropagation();
-                close(true);
+                cleanup();
+                resolve(true);
             };
 
             backdrop?.classList.add('active');
@@ -59,9 +59,10 @@ export const CustomDialog = {
             backdrop?.addEventListener('click', onBackdropClick, { once: true });
 
             const btnOk = document.getElementById('btnAlertOk');
-            btnOk.addEventListener('click', (e) => {
+            btnOk?.addEventListener('click', (e) => {
                 e.stopPropagation();
-                close(true);
+                cleanup();
+                resolve(true);
             }, { once: true });
         });
     },
@@ -88,34 +89,38 @@ export const CustomDialog = {
                 <button id="btnAlertConfirm" class="btn-alert btn-alert-danger">${confirmText}</button>
             `;
 
-            const close = (result) => {
+            // Helper untuk membersihkan modal & semua listener
+            const cleanup = () => {
                 modal?.classList.remove('active');
                 backdrop?.classList.remove('active');
                 backdrop?.removeEventListener('click', onBackdropClick);
-                resolve(result);
             };
 
             const onBackdropClick = (e) => {
                 e.stopPropagation();
-                close(false);
+                cleanup();
+                resolve(false);
             };
 
             backdrop?.classList.add('active');
             modal?.classList.add('active');
 
+            // Gunakan listener backdrop yang bersih
             backdrop?.addEventListener('click', onBackdropClick, { once: true });
 
             const btnConfirm = document.getElementById('btnAlertConfirm');
             const btnCancel = document.getElementById('btnAlertCancel');
 
-            btnConfirm.addEventListener('click', (e) => {
+            btnConfirm?.addEventListener('click', (e) => {
                 e.stopPropagation();
-                close(true);
+                cleanup();
+                resolve(true);
             }, { once: true });
 
-            btnCancel.addEventListener('click', (e) => {
+            btnCancel?.addEventListener('click', (e) => {
                 e.stopPropagation();
-                close(false);
+                cleanup();
+                resolve(false);
             }, { once: true });
         });
     }

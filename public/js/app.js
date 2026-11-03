@@ -56,7 +56,6 @@ function injectAdminDOM() {
         holder.innerHTML = `
             <div id="backdrop" class="backdrop"></div>
 
-            <!-- Modal Manage Type -->
             <div id="manageTypeModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Manage Type</h2>
@@ -73,7 +72,6 @@ function injectAdminDOM() {
                 <div id="typeListManage" class="typeListManage"></div>
             </div>
 
-            <!-- Modal Edit Type Detail -->
             <div id="editTypeModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Edit Type Detail</h2>
@@ -105,7 +103,6 @@ function injectAdminDOM() {
                 </form>
             </div>
 
-            <!-- Modal Manage Guide Groups -->
             <div id="manageGroupModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Manage Guide Group</h2>
@@ -118,7 +115,6 @@ function injectAdminDOM() {
                 <div id="groupListManage" class="typeListManage"></div>
             </div>
 
-            <!-- Modal Edit Guide Group Detail -->
             <div id="editGroupModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Edit Guide Group</h2>

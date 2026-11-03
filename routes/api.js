@@ -6,6 +6,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logActivity, getActivityLogs } from '../middleware/logger.js';
 
+// Import fungsi sanitasi dari middleware
+import { cleanText, cleanRichText } from '../middleware/inputSanitize.js';
+
 const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -17,6 +20,7 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
+// Synchronize concurrent write/delete tasks per guide
 const taskLocks = new Map();
 
 function enqueueTask(key, taskFn) {
@@ -25,9 +29,6 @@ function enqueueTask(key, taskFn) {
 
     const currentTask = previousTask
         .then(() => taskFn())
-        .catch((err) => {
-            throw err;
-        })
         .finally(() => {
             if (taskLocks.get(lockKey) === currentTask) {
                 taskLocks.delete(lockKey);
@@ -38,10 +39,23 @@ function enqueueTask(key, taskFn) {
     return currentTask;
 }
 
+function sanitizeFolderName(str) {
+    const sanitized = cleanText(str);
+    return (sanitized || 'default')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '_')
+        .replace(/_+/g, '_');
+}
+
 function looksLikeVideo(buf, ext) {
-    if (['.mp4', '.m4v', '.mov'].includes(ext)) return buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp';
-    if (ext === '.webm') return buf.length > 4 && buf.readUInt32BE(0) === 0x1A45DFA3;
-    return buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS';
+    if (!buf || buf.length < 4) return false;
+    if (['.mp4', '.m4v', '.mov'].includes(ext)) {
+        return buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp';
+    }
+    if (ext === '.webm') {
+        return buf.readUInt32BE(0) === 0x1A45DFA3;
+    }
+    return buf.toString('latin1', 0, 4) === 'OggS';
 }
 
 /**
@@ -71,6 +85,45 @@ function cleanupFileAndParentDir(relPath) {
     } catch (err) {
         console.warn('Pembersihan file fisik gagal:', err.message);
     }
+}
+
+/**
+ * Custom Binary Multipart Parser (Aman memori & binary safe)
+ */
+function parseMultipartBuffer(buffer, boundary) {
+    const boundaryBuf = Buffer.from(`--${boundary}`);
+    const result = { fields: {}, files: {} };
+    let start = buffer.indexOf(boundaryBuf);
+
+    while (start !== -1) {
+        const nextStart = buffer.indexOf(boundaryBuf, start + boundaryBuf.length);
+        if (nextStart === -1) break;
+
+        const part = buffer.subarray(start + boundaryBuf.length, nextStart);
+        const headerEnd = part.indexOf('\r\n\r\n');
+
+        if (headerEnd !== -1) {
+            const headerStr = part.subarray(0, headerEnd).toString('utf8');
+            const body = part.subarray(headerEnd + 4, part.length - 2);
+
+            const nameMatch = headerStr.match(/name="([^"]+)"/);
+            const filenameMatch = headerStr.match(/filename="([^"]+)"/);
+
+            if (nameMatch) {
+                const fieldName = nameMatch[1];
+                if (filenameMatch) {
+                    result.files[fieldName] = {
+                        filename: filenameMatch[1],
+                        data: body
+                    };
+                } else {
+                    result.fields[fieldName] = body.toString('utf8').trim();
+                }
+            }
+        }
+        start = nextStart;
+    }
+    return result;
 }
 
 // =============================================================
@@ -135,22 +188,24 @@ router.get('/types/:id', async (req, res, next) => {
 router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const { parentSlug, title, description, imgUrl } = req.body;
-        
-        if (!title || !title.trim()) {
+
+        const sanitizedTitle = cleanText(title);
+        const sanitizedDesc = cleanRichText(description || '');
+
+        if (!sanitizedTitle) {
             return res.status(400).json({ error: 'Title field is required' });
         }
 
-        const trimmedTitle = title.trim();
         const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
 
         const checkDuplicate = await db.query(
             `SELECT id FROM type 
             WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '')`,
-            [trimmedTitle]
+            [sanitizedTitle]
         );
 
         if (checkDuplicate.rows.length > 0) {
-            return res.status(400).json({ error: `Type dengan nama "${trimmedTitle}" sudah ada. Silakan gunakan nama lain.` });
+            return res.status(400).json({ error: `Type dengan nama "${sanitizedTitle}" sudah ada. Silakan gunakan nama lain.` });
         }
 
         const queryText = `
@@ -160,8 +215,8 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         const { rows } = await db.query(queryText, [
             validParentSlug,
-            trimmedTitle, 
-            description || '', 
+            sanitizedTitle,
+            sanitizedDesc,
             imgUrl || ''
         ]);
         await logActivity(req, `Create Type baru: ${rows[0].title} (ID: ${rows[0].id})`);
@@ -176,22 +231,28 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const { parentSlug, title, description, imgUrl } = req.body;
 
-    if (!title || !title.trim()) {
+    const sanitizedTitle = cleanText(title);
+    const sanitizedDesc = cleanRichText(description || '');
+
+    if (!sanitizedTitle) {
         return res.status(400).json({ error: 'Title field is required' });
     }
 
-    const newTitle = title.trim();
     const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
 
-    const checkDuplicate = await db.query(
-        `SELECT id FROM type 
-        WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
-        AND id != $2`,
-        [newTitle, id]
-    );
+    try {
+        const checkDuplicate = await db.query(
+            `SELECT id FROM type 
+            WHERE REPLACE(LOWER(TRIM(title)), ' ', '') = REPLACE(LOWER(TRIM($1)), ' ', '') 
+            AND id != $2`,
+            [sanitizedTitle, id]
+        );
 
-    if (checkDuplicate.rows.length > 0) {
-        return res.status(400).json({ error: `Type dengan nama "${newTitle}" sudah digunakan oleh Type lain.` });
+        if (checkDuplicate.rows.length > 0) {
+            return res.status(400).json({ error: `Type dengan nama "${sanitizedTitle}" sudah digunakan oleh Type lain.` });
+        }
+    } catch (err) {
+        return next(err);
     }
 
     const client = await db.getClient();
@@ -205,9 +266,8 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         }
 
         const oldTitle = oldTypeRes.rows[0].title;
-
-        const oldSafeFolder = oldTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
-        const newSafeFolder = newTitle.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+        const oldSafeFolder = sanitizeFolderName(oldTitle);
+        const newSafeFolder = sanitizeFolderName(sanitizedTitle);
 
         let finalImgUrl = imgUrl || '';
 
@@ -262,9 +322,9 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         const { rows } = await client.query(updateTypeQuery, [
             validParentSlug,
-            newTitle, 
-            description || '', 
-            finalImgUrl, 
+            sanitizedTitle,
+            sanitizedDesc,
+            finalImgUrl,
             id
         ]);
 
@@ -306,7 +366,7 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             if (row.video_url) cleanupFileAndParentDir(row.video_url);
         });
 
-        const safeTypeFolder = title.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+        const safeTypeFolder = sanitizeFolderName(title);
         const imgTypeDir = path.join(__dirname, '../public/img', safeTypeFolder);
         const videoTypeDir = path.join(__dirname, '../public/videos', safeTypeFolder);
 
@@ -404,7 +464,6 @@ router.get('/groups/:id', async (req, res, next) => {
 
         res.json(rows[0]);
     } catch (error) {
-        console.error('Error on GET /groups/:id:', error);
         next(error);
     }
 });
@@ -413,8 +472,14 @@ router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const { typeId, title, description, groupOrder } = req.body;
 
+    const sanitizedTitle = cleanText(title);
+    const sanitizedDesc = cleanRichText(description || '');
+
     if (!typeId) {
         return res.status(400).json({ error: 'typeId wajib diisi.' });
+    }
+    if (!sanitizedTitle) {
+        return res.status(400).json({ error: 'title wajib diisi.' });
     }
 
     try {
@@ -427,7 +492,7 @@ router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             WHERE id = $5
             RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
         `;
-        const { rows } = await db.query(queryText, [typeId, title, description || '', groupOrder || 0, id]);
+        const { rows } = await db.query(queryText, [typeId, sanitizedTitle, sanitizedDesc, groupOrder || 0, id]);
 
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Guide Group tidak ditemukan.' });
@@ -449,7 +514,10 @@ router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const { typeId, title, description, groupOrder } = req.body;
 
-        if (!typeId || !title || !title.trim()) {
+        const sanitizedTitle = cleanText(title);
+        const sanitizedDesc = cleanRichText(description || '');
+
+        if (!typeId || !sanitizedTitle) {
             return res.status(400).json({ error: 'typeId and title are required' });
         }
 
@@ -460,11 +528,11 @@ router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         const { rows } = await db.query(queryText, [
             typeId,
-            title.trim(),
-            description || '',
+            sanitizedTitle,
+            sanitizedDesc,
             groupOrder || 0
         ]);
-        
+
         await logActivity(req, `Create Group baru: "${rows[0].title}" (ID: ${rows[0].id})`);
         res.status(201).json(rows[0]);
     } catch (error) {
@@ -585,17 +653,19 @@ router.post('/guides/:id/view', async (req, res, next) => {
     }
 });
 
-// POST create guide (PERBAIKAN: Deklarasikan trimmedTitle)
+// POST create guide
 router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     const client = await db.getClient();
     try {
         const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
-        if (!groupId || !title || !functionDesc) {
+        const sanitizedTitle = cleanText(title);
+        const sanitizedFunctionDesc = cleanRichText(functionDesc || '');
+        const sanitizedImportantNote = cleanRichText(importantNote || '');
+
+        if (!groupId || !sanitizedTitle || !sanitizedFunctionDesc) {
             return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
         }
-
-        const trimmedTitle = title.trim();
 
         await client.query('BEGIN');
 
@@ -606,9 +676,9 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         const guideResult = await client.query(guideQuery, [
             groupId,
-            trimmedTitle,
-            functionDesc,
-            importantNote || '',
+            sanitizedTitle,
+            sanitizedFunctionDesc,
+            sanitizedImportantNote,
             videoUrl || ''
         ]);
         const guideId = guideResult.rows[0].id;
@@ -618,7 +688,9 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
                 INSERT INTO guide_steps (guide_id, step_order, step_description)
                 VALUES ($1, $2, $3);
             `;
-            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+            const cleanSteps = steps
+                .map(s => cleanRichText(String(s)))
+                .filter(Boolean);
 
             for (let i = 0; i < cleanSteps.length; i++) {
                 await client.query(stepsQuery, [guideId, i + 1, cleanSteps[i]]);
@@ -627,7 +699,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('COMMIT');
 
-        await logActivity(req, `Create Guide baru: "${trimmedTitle}" (ID: ${guideId})`);
+        await logActivity(req, `Create Guide baru: "${sanitizedTitle}" (ID: ${guideId})`);
         res.status(201).json({
             id: guideId,
             message: 'Guide created successfully'
@@ -640,7 +712,7 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// PUT update guide (PERBAIKAN: Deklarasikan trimmedTitle & oldTitle)
+// PUT update guide
 router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
@@ -653,11 +725,13 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
 
-        if (!groupId || !title || !functionDesc) {
+        const sanitizedTitle = cleanText(title);
+        const sanitizedFunctionDesc = cleanRichText(functionDesc || '');
+        const sanitizedImportantNote = cleanRichText(importantNote || '');
+
+        if (!groupId || !sanitizedTitle || !sanitizedFunctionDesc) {
             return res.status(400).json({ error: 'groupId, title, and functionDesc are required' });
         }
-
-        const trimmedTitle = title.trim();
 
         await client.query('BEGIN');
 
@@ -677,9 +751,9 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         `;
         await client.query(updateGuideQuery, [
             groupId,
-            trimmedTitle,
-            functionDesc,
-            importantNote || '',
+            sanitizedTitle,
+            sanitizedFunctionDesc,
+            sanitizedImportantNote,
             videoUrl || '',
             guideId
         ]);
@@ -687,7 +761,10 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         await client.query('DELETE FROM guide_steps WHERE guide_id = $1', [guideId]);
 
         if (Array.isArray(steps) && steps.length > 0) {
-            const cleanSteps = steps.map(s => String(s).trim()).filter(Boolean);
+            const cleanSteps = steps
+                .map(s => cleanRichText(String(s)))
+                .filter(Boolean);
+
             for (let i = 0; i < cleanSteps.length; i++) {
                 await client.query(
                     `INSERT INTO guide_steps (guide_id, step_order, step_description)
@@ -703,10 +780,10 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             cleanupFileAndParentDir(oldVideoUrl);
         }
 
-        if (oldTitle && oldTitle !== trimmedTitle) {
-            await logActivity(req, `Update Guide: "${oldTitle}" menjadi "${trimmedTitle}" (ID: ${guideId})`);
+        if (oldTitle && oldTitle !== sanitizedTitle) {
+            await logActivity(req, `Update Guide: "${oldTitle}" menjadi "${sanitizedTitle}" (ID: ${guideId})`);
         } else {
-            await logActivity(req, `Update Guide: "${trimmedTitle}" (ID: ${guideId})`);
+            await logActivity(req, `Update Guide: "${sanitizedTitle}" (ID: ${guideId})`);
         }
 
         res.json({ message: 'Guide updated successfully', id: guideId });
@@ -719,7 +796,7 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-// DELETE guide (PERBAIKAN: Ambil title pada RETURNING agar deletedTitle ada)
+// DELETE guide
 router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const { id } = req.params;
     const guideId = parseInt(id, 10);
@@ -728,55 +805,46 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         return res.status(400).json({ error: 'Invalid ID' });
     }
 
-    try {
-        const result = await enqueueTask(guideId, async () => {
-            const client = await db.getClient();
-            try {
-                await client.query('BEGIN');
+    enqueueTask(guideId, async () => {
+        const client = await db.getClient();
+        try {
+            await client.query('BEGIN');
 
-                const queryText = `
-                    DELETE FROM guide
-                    WHERE id = $1
-                    RETURNING id, title, video_url AS "videoUrl";
-                `;
-                const { rows } = await client.query(queryText, [guideId]);
+            const queryText = `
+                DELETE FROM guide
+                WHERE id = $1
+                RETURNING id, title, video_url AS "videoUrl";
+            `;
+            const { rows } = await client.query(queryText, [guideId]);
 
-                if (rows.length === 0) {
-                    await client.query('ROLLBACK');
-                    return null;
-                }
-
-                const deletedTitle = rows[0].title;
-                const videoUrl = rows[0].videoUrl;
-
-                await client.query('COMMIT');
-
-                if (videoUrl) {
-                    cleanupFileAndParentDir(videoUrl);
-                }
-
-                await logActivity(req, `Delete Guide: "${deletedTitle}" (ID: ${guideId})`);
-
-                return rows[0].id;
-            } catch (error) {
+            if (rows.length === 0) {
                 await client.query('ROLLBACK');
-                throw error;
-            } finally {
-                client.release();
+                return res.status(404).json({ error: 'Guide not found' });
             }
-        });
 
-        if (!result) {
-            return res.status(404).json({ error: 'Guide not found' });
+            const deletedTitle = rows[0].title;
+            const videoUrl = rows[0].videoUrl;
+
+            await client.query('COMMIT');
+
+            if (videoUrl) {
+                cleanupFileAndParentDir(videoUrl);
+            }
+
+            await logActivity(req, `Delete Guide: "${deletedTitle}" (ID: ${guideId})`);
+
+            res.json({
+                message: 'Guide deleted successfully',
+                deletedId: rows[0].id
+            });
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
         }
-
-        return res.json({
-            message: 'Guide deleted successfully',
-            deletedId: result
-        });
-    } catch (error) {
-        next(error);
-    }
+    }).catch(next);
 });
 
 // =============================================================
@@ -817,44 +885,17 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                     return res.status(400).json({ error: 'Invalid boundary' });
                 }
 
-                const boundary = boundaryMatch[1];
-                const data = buffer.toString('binary');
-                const parts = data.split(`--${boundary}`);
+                const parsed = parseMultipartBuffer(buffer, boundaryMatch[1]);
+                const videoFile = parsed.files['video'] || Object.values(parsed.files)[0];
+                const groupIdParam = parsed.fields['groupId'];
+                const titleParam = cleanText(parsed.fields['title']) || 'untitled';
 
-                let videoBuffer = null;
-                let videoFilename = '';
-                let groupIdParam = null;
-                let titleParam = 'untitled';
-
-                for (const part of parts) {
-                    if (part.includes('name="groupId"')) {
-                        const contentStart = part.indexOf('\r\n\r\n') + 4;
-                        const contentEnd = part.lastIndexOf('\r\n');
-                        groupIdParam = part.substring(contentStart, contentEnd).trim();
-                    }
-                    if (part.includes('name="title"')) {
-                        const contentStart = part.indexOf('\r\n\r\n') + 4;
-                        const contentEnd = part.lastIndexOf('\r\n');
-                        titleParam = part.substring(contentStart, contentEnd).trim() || 'untitled';
-                    }
-                    if (part.includes('filename=')) {
-                        const filenameMatch = part.match(/filename="([^"]+)"/);
-                        if (filenameMatch) {
-                            videoFilename = filenameMatch[1];
-                            const contentStart = part.indexOf('\r\n\r\n') + 4;
-                            const contentEnd = part.lastIndexOf('\r\n');
-                            const content = part.substring(contentStart, contentEnd);
-                            videoBuffer = Buffer.from(content, 'binary');
-                        }
-                    }
-                }
-
-                if (!videoBuffer || !videoFilename) {
+                if (!videoFile || !videoFile.filename) {
                     return res.status(400).json({ error: 'No video file provided' });
                 }
 
-                const extension = path.extname(videoFilename).toLowerCase();
-                if (!ALLOWED_VIDEO_EXTENSIONS.includes(extension) || !looksLikeVideo(videoBuffer, extension)) {
+                const extension = path.extname(videoFile.filename).toLowerCase();
+                if (!ALLOWED_VIDEO_EXTENSIONS.includes(extension) || !looksLikeVideo(videoFile.data, extension)) {
                     return res.status(400).json({
                         error: `File must be a supported video format (${ALLOWED_VIDEO_EXTENSIONS.join(', ')})`
                     });
@@ -874,8 +915,8 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                     }
                 }
 
-                const safeTypeFolder = typeNameFound.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
-                const safeTitleFolder = titleParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+                const safeTypeFolder = sanitizeFolderName(typeNameFound);
+                const safeTitleFolder = sanitizeFolderName(titleParam);
                 
                 const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
@@ -887,7 +928,7 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 const safeFilename = `${timestamp}${extension}`;
                 const filepath = path.join(targetDir, safeFilename);
 
-                fs.writeFileSync(filepath, videoBuffer);
+                fs.writeFileSync(filepath, videoFile.data);
 
                 const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
                 return res.json({ videoPath: videoUrl });
@@ -935,44 +976,22 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
                     return res.status(400).json({ error: 'Invalid boundary' });
                 }
 
-                const boundary = boundaryMatch[1];
-                const data = buffer.toString('binary');
-                const parts = data.split(`--${boundary}`);
+                const parsed = parseMultipartBuffer(buffer, boundaryMatch[1]);
+                const imageFile = parsed.files['image'] || Object.values(parsed.files)[0];
+                const typeNameParam = cleanText(parsed.fields['typeName']) || 'default';
 
-                let imageBuffer = null;
-                let imageFilename = '';
-                let typeNameParam = 'default';
-
-                for (const part of parts) {
-                    if (part.includes('name="typeName"')) {
-                        const contentStart = part.indexOf('\r\n\r\n') + 4;
-                        const contentEnd = part.lastIndexOf('\r\n');
-                        typeNameParam = part.substring(contentStart, contentEnd).trim() || 'default';
-                    }
-                    if (part.includes('filename=')) {
-                        const filenameMatch = part.match(/filename="([^"]+)"/);
-                        if (filenameMatch) {
-                            imageFilename = filenameMatch[1];
-                            const contentStart = part.indexOf('\r\n\r\n') + 4;
-                            const contentEnd = part.lastIndexOf('\r\n');
-                            const content = part.substring(contentStart, contentEnd);
-                            imageBuffer = Buffer.from(content, 'binary');
-                        }
-                    }
-                }
-
-                if (!imageBuffer || !imageFilename) {
+                if (!imageFile || !imageFile.filename) {
                     return res.status(400).json({ error: 'File gambar tidak ditemukan' });
                 }
 
-                const extension = path.extname(imageFilename).toLowerCase();
+                const extension = path.extname(imageFile.filename).toLowerCase();
                 if (!ALLOWED_IMAGE_EXTENSIONS.includes(extension)) {
                     return res.status(400).json({
                         error: `Format gambar harus berupa (${ALLOWED_IMAGE_EXTENSIONS.join(', ')})`
                     });
                 }
 
-                const safeTypeFolder = typeNameParam.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '_');
+                const safeTypeFolder = sanitizeFolderName(typeNameParam);
                 const targetDir = path.join(__dirname, '../public/img', safeTypeFolder);
 
                 if (!fs.existsSync(targetDir)) {
@@ -983,7 +1002,7 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
                 const safeFilename = `img_${timestamp}${extension}`;
                 const filepath = path.join(targetDir, safeFilename);
 
-                fs.writeFileSync(filepath, imageBuffer);
+                fs.writeFileSync(filepath, imageFile.data);
 
                 const imageRelPath = `/img/${safeTypeFolder}/${safeFilename}`;
                 return res.json({ imgUrl: imageRelPath });

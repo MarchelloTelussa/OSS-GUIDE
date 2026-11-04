@@ -7,20 +7,29 @@ import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { fileURLToPath } from 'url';
 import swaggerUi from 'swagger-ui-express';
+import basicAuth from 'express-basic-auth';
 import { createRequire } from 'module';
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
 //swagger
 const require = createRequire(import.meta.url);
 const swaggerDocument = require('./swagger-output.json');
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const swaggerProtection = basicAuth({
+  users: { 
+    [process.env.SWAGGER_USER || 'admin']: process.env.SWAGGER_PASS || 'AdminDefaultPass123!' 
+  },
+  challenge: true, // Memunculkan popup login di browser
+  realm: 'OSS Guide Protected Documentation'
+});
+app.use('/api-docs', swaggerProtection, swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(sessionMiddleware);

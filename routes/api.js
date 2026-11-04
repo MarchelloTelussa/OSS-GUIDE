@@ -132,6 +132,15 @@ function parseMultipartBuffer(buffer, boundary) {
 
 // GET all types
 router.get('/types', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Types']
+        #swagger.summary = 'Mendapatkan semua kategori Type'
+        #swagger.description = 'Mengambil seluruh daftar Type panduan beserta metadata image dan slug.'
+        #swagger.responses[200] = {
+            description: 'Berhasil mendapatkan daftar Type.',
+            schema: [{ id: 1, parentSlug: 'web', title: 'Web App', description: 'Panduan Web', imgUrl: '/img/web/img_1.png' }]
+        }
+    */
     try {
         const queryText = `
             SELECT id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl", created_at, updated_at
@@ -147,6 +156,14 @@ router.get('/types', async (req, res, next) => {
 
 // GET single type by ID
 router.get('/types/:id', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Types']
+        #swagger.summary = 'Mendapatkan rincian Type berdasarkan ID'
+        #swagger.description = 'Mengambil data Type spesifik beserta daftar Guide Groups yang ada di dalamnya.'
+        #swagger.parameters['id'] = { description: 'ID dari Type' }
+        #swagger.responses[200] = { description: 'Detail Type ditemukan' }
+        #swagger.responses[404] = { description: 'Type tidak ditemukan' }
+    */
     const { id } = req.params;
     try {
         const queryText = `
@@ -186,6 +203,25 @@ router.get('/types/:id', async (req, res, next) => {
 
 // POST create type (ITAdmin only)
 router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Types']
+        #swagger.summary = 'Membuat Type baru (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['body'] = {
+            in: 'body',
+            description: 'Data Type baru',
+            required: true,
+            schema: {
+                $parentSlug: 'web',
+                $title: 'Frontend Vue.js',
+                description: 'Panduan pengembangan aplikasi frontend Vue',
+                imgUrl: '/img/frontend_vue.png'
+            }
+        }
+        #swagger.responses[201] = { description: 'Type berhasil dibuat' }
+        #swagger.responses[400] = { description: 'Title wajib diisi / Duplicate title' }
+        #swagger.responses[401] = { description: 'Unauthorized' }
+    */
     try {
         const { parentSlug, title, description, imgUrl } = req.body;
 
@@ -228,6 +264,24 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
 
 // PUT update type (ITAdmin only)
 router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Types']
+        #swagger.summary = 'Perbarui Type berdasarkan ID (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Type yang diupdate' }
+        #swagger.parameters['body'] = {
+            in: 'body',
+            required: true,
+            schema: {
+                $parentSlug: 'web',
+                $title: 'Frontend Nuxt 3',
+                description: 'Panduan updated',
+                imgUrl: '/img/nuxt.png'
+            }
+        }
+        #swagger.responses[200] = { description: 'Type berhasil diperbarui' }
+        #swagger.responses[404] = { description: 'Type tidak ditemukan' }
+    */
     const { id } = req.params;
     const { parentSlug, title, description, imgUrl } = req.body;
 
@@ -342,6 +396,15 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
 // DELETE type (ITAdmin only)
 router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Types']
+        #swagger.summary = 'Hapus Type (Khusus ITAdmin)'
+        #swagger.description = 'Menghapus Type beserta file fisik gambar & video terkait secara permanen.'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Type yang dihapus' }
+        #swagger.responses[200] = { description: 'Type berhasil dihapus' }
+        #swagger.responses[404] = { description: 'Type tidak ditemukan' }
+    */
     const { id } = req.params;
     try {
         const typeRes = await db.query('SELECT title, image_url FROM type WHERE id = $1', [id]);
@@ -385,6 +448,18 @@ router.delete('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // =============================================================
 
 router.get('/groups', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guide Groups']
+        #swagger.summary = 'Mendapatkan daftar Guide Groups'
+        #swagger.description = 'Mengambil seluruh kelompok panduan. Bisa difilter berdasarkan typeId.'
+        #swagger.parameters['typeId'] = {
+            in: 'query',
+            description: 'Filter berdasarkan ID Type',
+            required: false,
+            type: 'integer'
+        }
+        #swagger.responses[200] = { description: 'Daftar Guide Groups berhasil diambil' }
+    */
     const { typeId } = req.query;
     try {
         let queryText = `
@@ -424,6 +499,13 @@ router.get('/groups', async (req, res, next) => {
 });
 
 router.get('/groups/:id', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guide Groups']
+        #swagger.summary = 'Mendapatkan rincian Guide Group berdasarkan ID'
+        #swagger.parameters['id'] = { description: 'ID Guide Group' }
+        #swagger.responses[200] = { description: 'Detail Guide Group ditemukan' }
+        #swagger.responses[404] = { description: 'Guide Group tidak ditemukan' }
+    */
     const { id } = req.params;
     try {
         const queryText = `
@@ -468,7 +550,70 @@ router.get('/groups/:id', async (req, res, next) => {
     }
 });
 
+router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guide Groups']
+        #swagger.summary = 'Membuat Guide Group baru (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['body'] = {
+            in: 'body',
+            required: true,
+            schema: {
+                $typeId: 1,
+                $title: 'Autentikasi & Otorisasi',
+                description: 'Kelompok panduan autentikasi',
+                groupOrder: 1
+            }
+        }
+        #swagger.responses[201] = { description: 'Guide Group berhasil dibuat' }
+    */
+    try {
+        const { typeId, title, description, groupOrder } = req.body;
+
+        const sanitizedTitle = cleanText(title);
+        const sanitizedDesc = cleanRichText(description || '');
+
+        if (!typeId || !sanitizedTitle) {
+            return res.status(400).json({ error: 'typeId and title are required' });
+        }
+
+        const queryText = `
+            INSERT INTO guide_groups (type_id, title, description, group_order)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
+        `;
+        const { rows } = await db.query(queryText, [
+            typeId,
+            sanitizedTitle,
+            sanitizedDesc,
+            groupOrder || 0
+        ]);
+
+        await logActivity(req, `Create Group baru: "${rows[0].title}" (ID: ${rows[0].id})`);
+        res.status(201).json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guide Groups']
+        #swagger.summary = 'Perbarui Guide Group (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Group' }
+        #swagger.parameters['body'] = {
+            in: 'body',
+            required: true,
+            schema: {
+                $typeId: 1,
+                $title: 'Autentikasi JWT',
+                description: 'Panduan Auth',
+                groupOrder: 2
+            }
+        }
+        #swagger.responses[200] = { description: 'Guide Group berhasil diperbarui' }
+    */
     const { id } = req.params;
     const { typeId, title, description, groupOrder } = req.body;
 
@@ -510,37 +655,14 @@ router.put('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     }
 });
 
-router.post('/groups', requireAuth('ITAdmin'), async (req, res, next) => {
-    try {
-        const { typeId, title, description, groupOrder } = req.body;
-
-        const sanitizedTitle = cleanText(title);
-        const sanitizedDesc = cleanRichText(description || '');
-
-        if (!typeId || !sanitizedTitle) {
-            return res.status(400).json({ error: 'typeId and title are required' });
-        }
-
-        const queryText = `
-            INSERT INTO guide_groups (type_id, title, description, group_order)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, type_id AS "typeId", title, description, group_order AS "groupOrder";
-        `;
-        const { rows } = await db.query(queryText, [
-            typeId,
-            sanitizedTitle,
-            sanitizedDesc,
-            groupOrder || 0
-        ]);
-
-        await logActivity(req, `Create Group baru: "${rows[0].title}" (ID: ${rows[0].id})`);
-        res.status(201).json(rows[0]);
-    } catch (error) {
-        next(error);
-    }
-});
-
 router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guide Groups']
+        #swagger.summary = 'Hapus Guide Group (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Group yang akan dihapus' }
+        #swagger.responses[200] = { description: 'Group berhasil dihapus' }
+    */
     const { id } = req.params;
     try {
         const queryText = `
@@ -566,6 +688,17 @@ router.delete('/groups/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // =============================================================
 
 router.get('/guides', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guides']
+        #swagger.summary = 'Mendapatkan semua item Guide'
+        #swagger.parameters['groupId'] = {
+            in: 'query',
+            description: 'Filter berdasarkan Group ID',
+            required: false,
+            type: 'integer'
+        }
+        #swagger.responses[200] = { description: 'Daftar Guide berhasil diperoleh' }
+    */
     const { groupId } = req.query;
     try {
         let queryText = `
@@ -596,6 +729,13 @@ router.get('/guides', async (req, res, next) => {
 });
 
 router.get('/guides/:id', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guides']
+        #swagger.summary = 'Mendapatkan rincian Guide & Langkah-langkahnya (Steps)'
+        #swagger.parameters['id'] = { description: 'ID Guide' }
+        #swagger.responses[200] = { description: 'Detail Guide & Steps ditemukan' }
+        #swagger.responses[404] = { description: 'Guide tidak ditemukan' }
+    */
     const { id } = req.params;
     try {
         const queryText = `
@@ -635,6 +775,12 @@ router.get('/guides/:id', async (req, res, next) => {
 });
 
 router.post('/guides/:id/view', async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guides']
+        #swagger.summary = 'Menambah jumlah view (viewcount) Guide'
+        #swagger.parameters['id'] = { description: 'ID Guide yang dikunjungi' }
+        #swagger.responses[200] = { description: 'Viewcount bertambah' }
+    */
     const { id } = req.params;
     try {
         const result = await db.query(
@@ -655,6 +801,27 @@ router.post('/guides/:id/view', async (req, res, next) => {
 
 // POST create guide
 router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guides']
+        #swagger.summary = 'Membuat Guide baru beserta Steps (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['body'] = {
+            in: 'body',
+            required: true,
+            schema: {
+                $groupId: 1,
+                $title: 'Cara Setup Environment Variable',
+                $functionDesc: 'Panduan konfigurasi file .env',
+                importantNote: 'Pastikan file .env disembunyikan di .gitignore',
+                videoUrl: '/videos/web/guide/env.mp4',
+                steps: [
+                    'Buat file .env di root',
+                    'Tambahkan PORT=3000'
+                ]
+            }
+        }
+        #swagger.responses[201] = { description: 'Guide berhasil dibuat' }
+    */
     const client = await db.getClient();
     try {
         const { groupId, title, functionDesc, importantNote, videoUrl, steps } = req.body;
@@ -714,6 +881,25 @@ router.post('/guides', requireAuth('ITAdmin'), async (req, res, next) => {
 
 // PUT update guide
 router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guides']
+        #swagger.summary = 'Perbarui Guide & Steps (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Guide' }
+        #swagger.parameters['body'] = {
+            in: 'body',
+            required: true,
+            schema: {
+                $groupId: 1,
+                $title: 'Cara Setup Environment Variable Update',
+                $functionDesc: 'Penjelasan baru',
+                importantNote: 'Catatan tambahan',
+                videoUrl: '/videos/web/guide/env_v2.mp4',
+                steps: ['Langkah 1 revisi', 'Langkah 2 revisi']
+            }
+        }
+        #swagger.responses[200] = { description: 'Guide berhasil diperbarui' }
+    */
     const { id } = req.params;
     const guideId = parseInt(id, 10);
 
@@ -798,6 +984,13 @@ router.put('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
 // DELETE guide
 router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Guides']
+        #swagger.summary = 'Hapus Guide (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Guide yang akan dihapus' }
+        #swagger.responses[200] = { description: 'Guide dan video terkait berhasil dihapus' }
+    */
     const { id } = req.params;
     const guideId = parseInt(id, 10);
 
@@ -852,6 +1045,23 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // =============================================================
 
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Uploads']
+        #swagger.summary = 'Upload File Video Panduan (Khusus ITAdmin)'
+        #swagger.description = 'Upload file video (Maks: 500MB). Disimpan dalam folder terstruktur berdasarkan Type & Title.'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.consumes = ['multipart/form-data']
+        #swagger.parameters['video'] = {
+            in: 'formData',
+            type: 'file',
+            required: true,
+            description: 'File video (mp4, m4v, mov, webm, ogv, ogg)'
+        }
+        #swagger.parameters['groupId'] = { in: 'formData', type: 'string' }
+        #swagger.parameters['title'] = { in: 'formData', type: 'string' }
+        #swagger.responses[200] = { description: 'Video berhasil di-upload', schema: { videoPath: '/videos/web/title/123.mp4' } }
+        #swagger.responses[413] = { description: 'Ukuran file melebihi batas 500 MB' }
+    */
     try {
         const chunks = [];
         let received = 0;
@@ -943,6 +1153,22 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 });
 
 router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Uploads']
+        #swagger.summary = 'Upload File Gambar Type (Khusus ITAdmin)'
+        #swagger.description = 'Upload gambar cover Type (Maks: 10MB).'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.consumes = ['multipart/form-data']
+        #swagger.parameters['image'] = {
+            in: 'formData',
+            type: 'file',
+            required: true,
+            description: 'File gambar (png, jpg, jpeg, webp)'
+        }
+        #swagger.parameters['typeName'] = { in: 'formData', type: 'string' }
+        #swagger.responses[200] = { description: 'Gambar berhasil di-upload', schema: { imgUrl: '/img/type_name/img_123.png' } }
+        #swagger.responses[413] = { description: 'Ukuran gambar melebihi 10 MB' }
+    */
     try {
         const chunks = [];
         let received = 0;
@@ -1018,6 +1244,14 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
 
 // GET /api/admin/logs (Khusus ITAdmin)
 router.get('/admin/logs', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Admin Logs']
+        #swagger.summary = 'Mendapatkan log aktivitas sistem (Khusus ITAdmin)'
+        #swagger.description = 'Mengambil 100 entri log aktivitas admin terbaru.'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.responses[200] = { description: 'Daftar log berhasil diambil' }
+        #swagger.responses[401] = { description: 'Unauthorized' }
+    */
     try {
         const logs = await getActivityLogs(100);
         res.json(logs);

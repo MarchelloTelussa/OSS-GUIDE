@@ -163,7 +163,11 @@
     },
     "/api/types": {
       "get": {
-        "description": "",
+        "tags": [
+          "Types"
+        ],
+        "summary": "Mendapatkan semua kategori Type",
+        "description": "Mengambil seluruh daftar Type panduan beserta metadata image dan slug.",
         "parameters": [
           {
             "name": "cookie",
@@ -173,7 +177,38 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Berhasil mendapatkan daftar Type.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "number",
+                    "example": 1
+                  },
+                  "parentSlug": {
+                    "type": "string",
+                    "example": "web"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Web App"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Panduan Web"
+                  },
+                  "imgUrl": {
+                    "type": "string",
+                    "example": "/img/web/img_1.png"
+                  }
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -181,6 +216,10 @@
         }
       },
       "post": {
+        "tags": [
+          "Types"
+        ],
+        "summary": "Membuat Type baru (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
@@ -191,31 +230,41 @@
           {
             "name": "body",
             "in": "body",
+            "description": "Data Type baru",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "parentSlug": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "web"
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Frontend Vue.js"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan pengembangan aplikasi frontend Vue"
                 },
                 "imgUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/img/frontend_vue.png"
                 }
-              }
+              },
+              "required": [
+                "parentSlug",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Type berhasil dibuat"
           },
           "400": {
-            "description": "Bad Request"
+            "description": "Title wajib diisi / Duplicate title"
           },
           "401": {
             "description": "Unauthorized"
@@ -223,18 +272,28 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/types/{id}": {
       "get": {
-        "description": "",
+        "tags": [
+          "Types"
+        ],
+        "summary": "Mendapatkan rincian Type berdasarkan ID",
+        "description": "Mengambil data Type spesifik beserta daftar Guide Groups yang ada di dalamnya.",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID dari Type"
           },
           {
             "name": "cookie",
@@ -244,24 +303,29 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Detail Type ditemukan"
           },
           "401": {
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Type tidak ditemukan"
           }
         }
       },
       "put": {
+        "tags": [
+          "Types"
+        ],
+        "summary": "Perbarui Type berdasarkan ID (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Type yang diupdate"
           },
           {
             "name": "cookie",
@@ -271,28 +335,37 @@
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "parentSlug": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "web"
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Frontend Nuxt 3"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan updated"
                 },
                 "imgUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/img/nuxt.png"
                 }
-              }
+              },
+              "required": [
+                "parentSlug",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Type berhasil diperbarui"
           },
           "400": {
             "description": "Bad Request"
@@ -304,18 +377,28 @@
             "description": "Forbidden"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Type tidak ditemukan"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
-        "description": "",
+        "tags": [
+          "Types"
+        ],
+        "summary": "Hapus Type (Khusus ITAdmin)",
+        "description": "Menghapus Type beserta file fisik gambar & video terkait secara permanen.",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Type yang dihapus"
           },
           {
             "name": "cookie",
@@ -325,7 +408,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Type berhasil dihapus"
           },
           "401": {
             "description": "Unauthorized"
@@ -334,14 +417,23 @@
             "description": "Forbidden"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Type tidak ditemukan"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/groups": {
       "get": {
-        "description": "",
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Mendapatkan daftar Guide Groups",
+        "description": "Mengambil seluruh kelompok panduan. Bisa difilter berdasarkan typeId.",
         "parameters": [
           {
             "name": "cookie",
@@ -351,12 +443,14 @@
           {
             "name": "typeId",
             "in": "query",
-            "type": "string"
+            "description": "Filter berdasarkan ID Type",
+            "required": false,
+            "type": "integer"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Daftar Guide Groups berhasil diambil"
           },
           "401": {
             "description": "Unauthorized"
@@ -364,6 +458,10 @@
         }
       },
       "post": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Membuat Guide Group baru (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
@@ -374,28 +472,37 @@
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "typeId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Autentikasi & Otorisasi"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Kelompok panduan autentikasi"
                 },
                 "groupOrder": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 }
-              }
+              },
+              "required": [
+                "typeId",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Guide Group berhasil dibuat"
           },
           "400": {
             "description": "Bad Request"
@@ -406,18 +513,28 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/groups/{id}": {
       "get": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Mendapatkan rincian Guide Group berdasarkan ID",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide Group"
           },
           {
             "name": "cookie",
@@ -427,24 +544,29 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Detail Guide Group ditemukan"
           },
           "401": {
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Guide Group tidak ditemukan"
           }
         }
       },
       "put": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Perbarui Guide Group (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Group"
           },
           {
             "name": "cookie",
@@ -454,28 +576,37 @@
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "typeId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Autentikasi JWT"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan Auth"
                 },
                 "groupOrder": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 2
                 }
-              }
+              },
+              "required": [
+                "typeId",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Guide Group berhasil diperbarui"
           },
           "400": {
             "description": "Bad Request"
@@ -489,16 +620,26 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Hapus Guide Group (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Group yang akan dihapus"
           },
           {
             "name": "cookie",
@@ -508,7 +649,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Group berhasil dihapus"
           },
           "401": {
             "description": "Unauthorized"
@@ -519,11 +660,20 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/guides": {
       "get": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Mendapatkan semua item Guide",
         "description": "",
         "parameters": [
           {
@@ -534,12 +684,14 @@
           {
             "name": "groupId",
             "in": "query",
-            "type": "string"
+            "description": "Filter berdasarkan Group ID",
+            "required": false,
+            "type": "integer"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Daftar Guide berhasil diperoleh"
           },
           "401": {
             "description": "Unauthorized"
@@ -547,6 +699,10 @@
         }
       },
       "post": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Membuat Guide baru beserta Steps (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
@@ -557,34 +713,52 @@
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "groupId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Cara Setup Environment Variable"
                 },
                 "functionDesc": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan konfigurasi file .env"
                 },
                 "importantNote": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Pastikan file .env disembunyikan di .gitignore"
                 },
                 "videoUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/videos/web/guide/env.mp4"
                 },
                 "steps": {
-                  "example": "any"
+                  "type": "array",
+                  "example": [
+                    "Buat file .env di root",
+                    "Tambahkan PORT=3000"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
                 }
-              }
+              },
+              "required": [
+                "groupId",
+                "title",
+                "functionDesc"
+              ]
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Guide berhasil dibuat"
           },
           "400": {
             "description": "Bad Request"
@@ -595,18 +769,28 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/guides/{id}": {
       "get": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Mendapatkan rincian Guide & Langkah-langkahnya (Steps)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide"
           },
           {
             "name": "cookie",
@@ -616,24 +800,29 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Detail Guide & Steps ditemukan"
           },
           "401": {
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Guide tidak ditemukan"
           }
         }
       },
       "put": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Perbarui Guide & Steps (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide"
           },
           {
             "name": "cookie",
@@ -643,34 +832,52 @@
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "groupId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Cara Setup Environment Variable Update"
                 },
                 "functionDesc": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Penjelasan baru"
                 },
                 "importantNote": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Catatan tambahan"
                 },
                 "videoUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/videos/web/guide/env_v2.mp4"
                 },
                 "steps": {
-                  "example": "any"
+                  "type": "array",
+                  "example": [
+                    "Langkah 1 revisi",
+                    "Langkah 2 revisi"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
                 }
-              }
+              },
+              "required": [
+                "groupId",
+                "title",
+                "functionDesc"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Guide berhasil diperbarui"
           },
           "400": {
             "description": "Bad Request"
@@ -684,16 +891,26 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Hapus Guide (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide yang akan dihapus"
           },
           {
             "name": "cookie",
@@ -703,7 +920,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Guide dan video terkait berhasil dihapus"
           },
           "400": {
             "description": "Bad Request"
@@ -717,18 +934,28 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/guides/{id}/view": {
       "post": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Menambah jumlah view (viewcount) Guide",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide yang dikunjungi"
           },
           {
             "name": "cookie",
@@ -738,7 +965,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Viewcount bertambah"
           },
           "401": {
             "description": "Unauthorized"
@@ -751,11 +978,35 @@
     },
     "/api/upload-video": {
       "post": {
-        "description": "",
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Upload File Video Panduan (Khusus ITAdmin)",
+        "description": "Upload file video (Maks: 500MB). Disimpan dalam folder terstruktur berdasarkan Type & Title.",
+        "consumes": [
+          "multipart/form-data"
+        ],
         "parameters": [
           {
             "name": "cookie",
             "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "video",
+            "in": "formData",
+            "type": "file",
+            "required": true,
+            "description": "File video (mp4, m4v, mov, webm, ogv, ogg)"
+          },
+          {
+            "name": "groupId",
+            "in": "formData",
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "in": "formData",
             "type": "string"
           },
           {
@@ -766,7 +1017,19 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Video berhasil di-upload",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "videoPath": {
+                  "type": "string",
+                  "example": "/videos/web/title/123.mp4"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           },
           "400": {
             "description": "Bad Request"
@@ -778,18 +1041,42 @@
             "description": "Forbidden"
           },
           "413": {
-            "description": "Payload Too Large"
+            "description": "Ukuran file melebihi batas 500 MB"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/upload-image": {
       "post": {
-        "description": "",
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Upload File Gambar Type (Khusus ITAdmin)",
+        "description": "Upload gambar cover Type (Maks: 10MB).",
+        "consumes": [
+          "multipart/form-data"
+        ],
         "parameters": [
           {
             "name": "cookie",
             "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "image",
+            "in": "formData",
+            "type": "file",
+            "required": true,
+            "description": "File gambar (png, jpg, jpeg, webp)"
+          },
+          {
+            "name": "typeName",
+            "in": "formData",
             "type": "string"
           },
           {
@@ -800,7 +1087,19 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Gambar berhasil di-upload",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "imgUrl": {
+                  "type": "string",
+                  "example": "/img/type_name/img_123.png"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           },
           "400": {
             "description": "Bad Request"
@@ -812,14 +1111,23 @@
             "description": "Forbidden"
           },
           "413": {
-            "description": "Payload Too Large"
+            "description": "Ukuran gambar melebihi 10 MB"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/api/admin/logs": {
       "get": {
-        "description": "",
+        "tags": [
+          "Admin Logs"
+        ],
+        "summary": "Mendapatkan log aktivitas sistem (Khusus ITAdmin)",
+        "description": "Mengambil 100 entri log aktivitas admin terbaru.",
         "parameters": [
           {
             "name": "cookie",
@@ -829,7 +1137,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Daftar log berhasil diambil"
           },
           "401": {
             "description": "Unauthorized"
@@ -837,49 +1145,103 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/types": {
       "get": {
-        "description": "",
+        "tags": [
+          "Types"
+        ],
+        "summary": "Mendapatkan semua kategori Type",
+        "description": "Mengambil seluruh daftar Type panduan beserta metadata image dan slug.",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Berhasil mendapatkan daftar Type.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "number",
+                    "example": 1
+                  },
+                  "parentSlug": {
+                    "type": "string",
+                    "example": "web"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Web App"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Panduan Web"
+                  },
+                  "imgUrl": {
+                    "type": "string",
+                    "example": "/img/web/img_1.png"
+                  }
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           }
         }
       },
       "post": {
+        "tags": [
+          "Types"
+        ],
+        "summary": "Membuat Type baru (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "body",
             "in": "body",
+            "description": "Data Type baru",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "parentSlug": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "web"
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Frontend Vue.js"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan pengembangan aplikasi frontend Vue"
                 },
                 "imgUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/img/frontend_vue.png"
                 }
-              }
+              },
+              "required": [
+                "parentSlug",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Type berhasil dibuat"
           },
           "400": {
-            "description": "Bad Request"
+            "description": "Title wajib diisi / Duplicate title"
           },
           "401": {
             "description": "Unauthorized"
@@ -887,63 +1249,87 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/types/{id}": {
       "get": {
-        "description": "",
+        "tags": [
+          "Types"
+        ],
+        "summary": "Mendapatkan rincian Type berdasarkan ID",
+        "description": "Mengambil data Type spesifik beserta daftar Guide Groups yang ada di dalamnya.",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID dari Type"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Detail Type ditemukan"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Type tidak ditemukan"
           }
         }
       },
       "put": {
+        "tags": [
+          "Types"
+        ],
+        "summary": "Perbarui Type berdasarkan ID (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Type yang diupdate"
           },
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "parentSlug": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "web"
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Frontend Nuxt 3"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan updated"
                 },
                 "imgUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/img/nuxt.png"
                 }
-              }
+              },
+              "required": [
+                "parentSlug",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Type berhasil diperbarui"
           },
           "400": {
             "description": "Bad Request"
@@ -955,23 +1341,33 @@
             "description": "Forbidden"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Type tidak ditemukan"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
-        "description": "",
+        "tags": [
+          "Types"
+        ],
+        "summary": "Hapus Type (Khusus ITAdmin)",
+        "description": "Menghapus Type beserta file fisik gambar & video terkait secara permanen.",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Type yang dihapus"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Type berhasil dihapus"
           },
           "401": {
             "description": "Unauthorized"
@@ -980,55 +1376,79 @@
             "description": "Forbidden"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Type tidak ditemukan"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/groups": {
       "get": {
-        "description": "",
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Mendapatkan daftar Guide Groups",
+        "description": "Mengambil seluruh kelompok panduan. Bisa difilter berdasarkan typeId.",
         "parameters": [
           {
             "name": "typeId",
             "in": "query",
-            "type": "string"
+            "description": "Filter berdasarkan ID Type",
+            "required": false,
+            "type": "integer"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Daftar Guide Groups berhasil diambil"
           }
         }
       },
       "post": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Membuat Guide Group baru (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "typeId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Autentikasi & Otorisasi"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Kelompok panduan autentikasi"
                 },
                 "groupOrder": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 }
-              }
+              },
+              "required": [
+                "typeId",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Guide Group berhasil dibuat"
           },
           "400": {
             "description": "Bad Request"
@@ -1039,63 +1459,87 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/groups/{id}": {
       "get": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Mendapatkan rincian Guide Group berdasarkan ID",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide Group"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Detail Guide Group ditemukan"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Guide Group tidak ditemukan"
           }
         }
       },
       "put": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Perbarui Guide Group (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Group"
           },
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "typeId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Autentikasi JWT"
                 },
                 "description": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan Auth"
                 },
                 "groupOrder": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 2
                 }
-              }
+              },
+              "required": [
+                "typeId",
+                "title"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Guide Group berhasil diperbarui"
           },
           "400": {
             "description": "Bad Request"
@@ -1109,21 +1553,31 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
+        "tags": [
+          "Guide Groups"
+        ],
+        "summary": "Hapus Guide Group (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Group yang akan dihapus"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Group berhasil dihapus"
           },
           "401": {
             "description": "Unauthorized"
@@ -1134,59 +1588,92 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/guides": {
       "get": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Mendapatkan semua item Guide",
         "description": "",
         "parameters": [
           {
             "name": "groupId",
             "in": "query",
-            "type": "string"
+            "description": "Filter berdasarkan Group ID",
+            "required": false,
+            "type": "integer"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Daftar Guide berhasil diperoleh"
           }
         }
       },
       "post": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Membuat Guide baru beserta Steps (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "groupId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Cara Setup Environment Variable"
                 },
                 "functionDesc": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Panduan konfigurasi file .env"
                 },
                 "importantNote": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Pastikan file .env disembunyikan di .gitignore"
                 },
                 "videoUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/videos/web/guide/env.mp4"
                 },
                 "steps": {
-                  "example": "any"
+                  "type": "array",
+                  "example": [
+                    "Buat file .env di root",
+                    "Tambahkan PORT=3000"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
                 }
-              }
+              },
+              "required": [
+                "groupId",
+                "title",
+                "functionDesc"
+              ]
             }
           }
         ],
         "responses": {
           "201": {
-            "description": "Created"
+            "description": "Guide berhasil dibuat"
           },
           "400": {
             "description": "Bad Request"
@@ -1197,69 +1684,102 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/guides/{id}": {
       "get": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Mendapatkan rincian Guide & Langkah-langkahnya (Steps)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Detail Guide & Steps ditemukan"
           },
           "404": {
-            "description": "Not Found"
+            "description": "Guide tidak ditemukan"
           }
         }
       },
       "put": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Perbarui Guide & Steps (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide"
           },
           {
             "name": "body",
             "in": "body",
+            "required": true,
             "schema": {
               "type": "object",
               "properties": {
                 "groupId": {
-                  "example": "any"
+                  "type": "number",
+                  "example": 1
                 },
                 "title": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Cara Setup Environment Variable Update"
                 },
                 "functionDesc": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Penjelasan baru"
                 },
                 "importantNote": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "Catatan tambahan"
                 },
                 "videoUrl": {
-                  "example": "any"
+                  "type": "string",
+                  "example": "/videos/web/guide/env_v2.mp4"
                 },
                 "steps": {
-                  "example": "any"
+                  "type": "array",
+                  "example": [
+                    "Langkah 1 revisi",
+                    "Langkah 2 revisi"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
                 }
-              }
+              },
+              "required": [
+                "groupId",
+                "title",
+                "functionDesc"
+              ]
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Guide berhasil diperbarui"
           },
           "400": {
             "description": "Bad Request"
@@ -1273,21 +1793,31 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       },
       "delete": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Hapus Guide (Khusus ITAdmin)",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide yang akan dihapus"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Guide dan video terkait berhasil dihapus"
           },
           "400": {
             "description": "Bad Request"
@@ -1301,23 +1831,33 @@
           "404": {
             "description": "Not Found"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/guides/{id}/view": {
       "post": {
+        "tags": [
+          "Guides"
+        ],
+        "summary": "Menambah jumlah view (viewcount) Guide",
         "description": "",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
-            "type": "string"
+            "type": "string",
+            "description": "ID Guide yang dikunjungi"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Viewcount bertambah"
           },
           "404": {
             "description": "Not Found"
@@ -1327,8 +1867,32 @@
     },
     "/upload-video": {
       "post": {
-        "description": "",
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Upload File Video Panduan (Khusus ITAdmin)",
+        "description": "Upload file video (Maks: 500MB). Disimpan dalam folder terstruktur berdasarkan Type & Title.",
+        "consumes": [
+          "multipart/form-data"
+        ],
         "parameters": [
+          {
+            "name": "video",
+            "in": "formData",
+            "type": "file",
+            "required": true,
+            "description": "File video (mp4, m4v, mov, webm, ogv, ogg)"
+          },
+          {
+            "name": "groupId",
+            "in": "formData",
+            "type": "string"
+          },
+          {
+            "name": "title",
+            "in": "formData",
+            "type": "string"
+          },
           {
             "name": "content-type",
             "in": "header",
@@ -1337,7 +1901,19 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Video berhasil di-upload",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "videoPath": {
+                  "type": "string",
+                  "example": "/videos/web/title/123.mp4"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           },
           "400": {
             "description": "Bad Request"
@@ -1349,15 +1925,39 @@
             "description": "Forbidden"
           },
           "413": {
-            "description": "Payload Too Large"
+            "description": "Ukuran file melebihi batas 500 MB"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/upload-image": {
       "post": {
-        "description": "",
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Upload File Gambar Type (Khusus ITAdmin)",
+        "description": "Upload gambar cover Type (Maks: 10MB).",
+        "consumes": [
+          "multipart/form-data"
+        ],
         "parameters": [
+          {
+            "name": "image",
+            "in": "formData",
+            "type": "file",
+            "required": true,
+            "description": "File gambar (png, jpg, jpeg, webp)"
+          },
+          {
+            "name": "typeName",
+            "in": "formData",
+            "type": "string"
+          },
           {
             "name": "content-type",
             "in": "header",
@@ -1366,7 +1966,19 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Gambar berhasil di-upload",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "imgUrl": {
+                  "type": "string",
+                  "example": "/img/type_name/img_123.png"
+                }
+              },
+              "xml": {
+                "name": "main"
+              }
+            }
           },
           "400": {
             "description": "Bad Request"
@@ -1378,17 +1990,26 @@
             "description": "Forbidden"
           },
           "413": {
-            "description": "Payload Too Large"
+            "description": "Ukuran gambar melebihi 10 MB"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/admin/logs": {
       "get": {
-        "description": "",
+        "tags": [
+          "Admin Logs"
+        ],
+        "summary": "Mendapatkan log aktivitas sistem (Khusus ITAdmin)",
+        "description": "Mengambil 100 entri log aktivitas admin terbaru.",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Daftar log berhasil diambil"
           },
           "401": {
             "description": "Unauthorized"
@@ -1396,7 +2017,12 @@
           "403": {
             "description": "Forbidden"
           }
-        }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
       }
     },
     "/login": {

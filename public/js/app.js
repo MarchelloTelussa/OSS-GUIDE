@@ -5,7 +5,8 @@ import { initAuth, hasRole, getCurrentUser } from './auth-state.js';
 const state = {
     typeParents: [
         { slug: 'web', title: 'Web' },
-        { slug: 'mobile', title: 'Mobile' }
+        { slug: 'mobile', title: 'Mobile' },
+        { slug: 'email', title: 'Email' }
     ],
     types: [],
     selectedTypeId: null,
@@ -65,6 +66,7 @@ function injectAdminDOM() {
                     <select id="newTypeParentSelect" class="selectParent">
                         <option value="web">Web</option>
                         <option value="mobile">Mobile</option>
+                        <option value="email">Email</option>
                     </select>
                     <input type="text" id="newTypeTitleInput" placeholder="Masukkan judul type baru...">
                     <button id="btnSubmitAddType" title="Tambah Type"><i class="fa-solid fa-plus"></i></button>
@@ -92,6 +94,7 @@ function injectAdminDOM() {
                         <select id="editTypeParentSelect" class="selectParentInput">
                             <option value="web">Web</option>
                             <option value="mobile">Mobile</option>
+                            <option value="email">Email</option>
                         </select>
                     </div>
                     <div>

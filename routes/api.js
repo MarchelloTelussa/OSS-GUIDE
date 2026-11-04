@@ -232,7 +232,7 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
             return res.status(400).json({ error: 'Title field is required' });
         }
 
-        const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
+        const validParentSlug = parentSlug && ['web', 'mobile', 'email'].includes(parentSlug) ? parentSlug : 'web';
 
         const checkDuplicate = await db.query(
             `SELECT id FROM type 
@@ -292,7 +292,7 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
         return res.status(400).json({ error: 'Title field is required' });
     }
 
-    const validParentSlug = parentSlug && ['web', 'mobile'].includes(parentSlug) ? parentSlug : 'web';
+    const validParentSlug = parentSlug && ['web', 'mobile', 'email'].includes(parentSlug) ? parentSlug : 'web';
 
     try {
         const checkDuplicate = await db.query(

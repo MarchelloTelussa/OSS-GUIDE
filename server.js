@@ -23,7 +23,7 @@ const PORT = process.env.PORT || 3000;
 
 const swaggerProtection = basicAuth({
   users: { 
-    [process.env.SWAGGER_USER || 'admin']: process.env.SWAGGER_PASS || 'AdminDefaultPass123!' 
+    [process.env.SWAGGER_USER]: process.env.SWAGGER_PASS 
   },
   challenge: true, // Memunculkan popup login di browser
   realm: 'OSS Guide Protected Documentation'

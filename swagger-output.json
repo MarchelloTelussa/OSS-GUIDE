@@ -1127,12 +1127,24 @@
           "Admin Logs"
         ],
         "summary": "Mendapatkan log aktivitas sistem (Khusus ITAdmin)",
-        "description": "Mengambil 100 entri log aktivitas admin terbaru.",
+        "description": "Mengambil log aktivitas admin dengan paginasi.",
         "parameters": [
           {
             "name": "cookie",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10
           }
         ],
         "responses": {
@@ -2006,7 +2018,21 @@
           "Admin Logs"
         ],
         "summary": "Mendapatkan log aktivitas sistem (Khusus ITAdmin)",
-        "description": "Mengambil 100 entri log aktivitas admin terbaru.",
+        "description": "Mengambil log aktivitas admin dengan paginasi.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10
+          }
+        ],
         "responses": {
           "200": {
             "description": "Daftar log berhasil diambil"

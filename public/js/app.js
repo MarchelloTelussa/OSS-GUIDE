@@ -21,6 +21,10 @@ let currentExistingImgUrl = '';
 // Dynamic Elements Cache
 let elements = {};
 
+let currentLogPage = 1;
+const LOGS_PER_PAGE = 10; // Jumlah baris log per halaman
+
+
 /**
  * Initialize Dashboard & Authenticate User
  */
@@ -281,7 +285,10 @@ function renderDefaultView() {
 /**
  * Render Tampilan Log Aktivitas saat Lonceng diklik
  */
-async function renderActivityLogView() {
+
+async function renderActivityLogView(page = 1) {
+
+    currentLogPage = page;
     state.selectedTypeId = null;
     renderTypeTabs();
 
@@ -292,6 +299,7 @@ async function renderActivityLogView() {
 
     if (!elements.typeIdentityContainer) return;
 
+    // Render Kerangka Layar Log + Kontrol Paginasi di Bawah
     elements.typeIdentityContainer.className = 'typeIdentity activity-log-view';
     elements.typeIdentityContainer.innerHTML = `
         <div class="logContainerHeader">
@@ -299,7 +307,6 @@ async function renderActivityLogView() {
             <div class="logHeaderActions">
                 <select id="logMethodFilter" class="logFilterSelect">
                     <option value="ALL">Semua Method</option>
-                    <option value="GET">GET</option>
                     <option value="POST">POST</option>
                     <option value="PUT">PUT</option>
                     <option value="DELETE">DELETE</option>
@@ -307,14 +314,19 @@ async function renderActivityLogView() {
                 <button id="btnCloseLogView" class="closeModalBtn" title="Tutup Log">&times;</button>
             </div>
         </div>
+
+        <!-- Tempat Konten Tabel Log -->
         <div id="logListContent" class="logListContent">
-            <p style="text-align: center; color: var(--text2);">Memuat data log...</p>
+            <p style="text-align: center; color: var(--text2); padding: 1.5rem;">Memuat data log...</p>
         </div>
+
+        <!-- Kontainer Navigasi Paginasi -->
+        <div id="logPaginationContainer" class="logPaginationContainer"></div>
     `;
 
     document.getElementById('btnCloseLogView')?.addEventListener('click', renderDefaultView);
 
-    // Event listener untuk filter method
+    // Event listener filter HTTP Method pada tabel aktif
     document.getElementById('logMethodFilter')?.addEventListener('change', (e) => {
         const selectedMethod = e.target.value;
         const rows = document.querySelectorAll('.logTable tbody tr');
@@ -329,20 +341,39 @@ async function renderActivityLogView() {
         });
     });
 
+    // Ambil & Render Log Halaman Pertama
+    await fetchAndRenderLogs(currentLogPage);
+}
+
+async function fetchAndRenderLogs(page) {
+    const logContent = document.getElementById('logListContent');
+    const paginationContent = document.getElementById('logPaginationContainer');
+
+    if (logContent) {
+        logContent.innerHTML = '<p style="text-align: center; color: var(--text2); padding: 1.5rem;">Memuat data log...</p>';
+    }
+
     try {
-        const response = await fetch(`${API_BASE}/admin/logs`);
+        const response = await fetch(`${API_BASE}/admin/logs?page=${page}&limit=${LOGS_PER_PAGE}`);
         if (!response.ok) throw new Error('Gagal mengambil data log');
 
-        const logs = await response.json();
-        const logContent = document.getElementById('logListContent');
+        // Struktur respon expected: { logs: [...], totalPages: number, currentPage: number, totalLogs: number }
+        const data = await response.json();
+        
+        // Handling jika response array langsung (fallback) vs objek paginasi
+        const logs = Array.isArray(data) ? data : (data.logs || []);
+        const totalPages = data.totalPages || 1;
+        const currentPage = data.currentPage || page;
 
         if (!logContent) return;
 
         if (logs.length === 0) {
             logContent.innerHTML = '<p style="text-align: center; padding: 1rem;">Belum ada riwayat aktivitas.</p>';
+            if (paginationContent) paginationContent.innerHTML = '';
             return;
         }
 
+        // 1. Render Tabel Log
         logContent.innerHTML = `
             <table class="logTable">
                 <thead>
@@ -367,9 +398,55 @@ async function renderActivityLogView() {
                 </tbody>
             </table>
         `;
+
+        // 2. Render Tombol Paginasi
+    if (paginationContent) {
+        let pageButtons = '';
+        
+        // Generasi tombol angka halaman
+        for (let i = 1; i <= totalPages; i++) {
+            pageButtons += `
+                <button class="logPageBtn ${i === currentPage ? 'active' : ''}" data-page="${i}">
+                    ${i}
+                </button>
+            `;
+        }
+
+        paginationContent.innerHTML = `
+            <div class="logPaginationWrapper">
+                <button class="logPageBtn navBtn" id="btnPrevLog" ${currentPage <= 1 ? 'disabled' : ''} title="Halaman Sebelumnya">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="logPageNumbers">
+                    ${pageButtons}
+                </div>
+                <button class="logPageBtn navBtn" id="btnNextLog" ${currentPage >= totalPages ? 'disabled' : ''} title="Halaman Selanjutnya">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+
+        // Event listener untuk tombol prev & next
+        document.getElementById('btnPrevLog')?.addEventListener('click', () => {
+            if (currentPage > 1) fetchAndRenderLogs(currentPage - 1);
+        });
+
+        document.getElementById('btnNextLog')?.addEventListener('click', () => {
+            if (currentPage < totalPages) fetchAndRenderLogs(currentPage + 1);
+        });
+
+        // Event listener untuk tombol angka halaman
+        document.querySelectorAll('.logPageNumbers .logPageBtn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetPage = parseInt(e.currentTarget.getAttribute('data-page'), 10);
+                if (targetPage !== currentPage) {
+                    fetchAndRenderLogs(targetPage);
+                }
+            });
+        });
+    }
     } catch (error) {
         console.error('Error loading activity logs:', error);
-        const logContent = document.getElementById('logListContent');
         if (logContent) {
             logContent.innerHTML = '<p style="text-align: center; color: var(--danger); padding: 1rem;">Gagal memuat log aktivitas.</p>';
         }

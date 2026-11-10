@@ -18,8 +18,16 @@ export async function logActivity(req, action) {
     }
 }
 
-export async function getActivityLogs(limit = 100) {
-    const { rows } = await db.query(`
+export async function getActivityLogs(page = 1, limit = 10) {
+    const offset = (page - 1) * limit;
+
+    // 1. Ambil total jumlah data log untuk kalkulasi total halaman
+    const countResult = await db.query(`SELECT COUNT(*) FROM activity_logs`);
+    const totalLogs = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.ceil(totalLogs / limit);
+
+    // 2. Ambil data log sesuai OFFSET & LIMIT
+    const { rows: logs } = await db.query(`
         SELECT 
             l.id, 
             l.user_id AS "userId", 
@@ -33,8 +41,13 @@ export async function getActivityLogs(limit = 100) {
         FROM activity_logs l
         LEFT JOIN users u ON l.user_id = u.id
         ORDER BY l.created_at DESC
-        LIMIT $1
-    `, [limit]);
+        LIMIT $1 OFFSET $2
+    `, [limit, offset]);
 
-    return rows;
+    return {
+        logs,
+        totalLogs,
+        totalPages,
+        currentPage: page
+    };
 }

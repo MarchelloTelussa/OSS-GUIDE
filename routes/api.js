@@ -224,7 +224,6 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     */
     try {
         const { parentSlug, title, description, imgUrl } = req.body;
-
         const sanitizedTitle = cleanText(title);
         const sanitizedDesc = cleanRichText(description || '');
 
@@ -1247,14 +1246,20 @@ router.get('/admin/logs', requireAuth('ITAdmin'), async (req, res, next) => {
     /* 
         #swagger.tags = ['Admin Logs']
         #swagger.summary = 'Mendapatkan log aktivitas sistem (Khusus ITAdmin)'
-        #swagger.description = 'Mengambil 100 entri log aktivitas admin terbaru.'
+        #swagger.description = 'Mengambil log aktivitas admin dengan paginasi.'
         #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['page'] = { in: 'query', type: 'integer', default: 1 }
+        #swagger.parameters['limit'] = { in: 'query', type: 'integer', default: 10 }
         #swagger.responses[200] = { description: 'Daftar log berhasil diambil' }
         #swagger.responses[401] = { description: 'Unauthorized' }
     */
     try {
-        const logs = await getActivityLogs(100);
-        res.json(logs);
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 10;
+
+        const result = await getActivityLogs(page, limit);
+        
+        res.json(result);
     } catch (error) {
         next(error);
     }

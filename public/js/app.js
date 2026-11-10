@@ -22,7 +22,8 @@ let currentExistingImgUrl = '';
 let elements = {};
 
 let currentLogPage = 1;
-const LOGS_PER_PAGE = 10; // Jumlah baris log per halaman
+let currentMethodFilter = 'ALL';
+const LOGS_PER_PAGE = 10;
 
 
 /**
@@ -287,8 +288,8 @@ function renderDefaultView() {
  */
 
 async function renderActivityLogView(page = 1) {
-
     currentLogPage = page;
+    currentMethodFilter = 'ALL';
     state.selectedTypeId = null;
     renderTypeTabs();
 
@@ -299,7 +300,6 @@ async function renderActivityLogView(page = 1) {
 
     if (!elements.typeIdentityContainer) return;
 
-    // Render Kerangka Layar Log + Kontrol Paginasi di Bawah
     elements.typeIdentityContainer.className = 'typeIdentity activity-log-view';
     elements.typeIdentityContainer.innerHTML = `
         <div class="logContainerHeader">
@@ -315,37 +315,54 @@ async function renderActivityLogView(page = 1) {
             </div>
         </div>
 
-        <!-- Tempat Konten Tabel Log -->
         <div id="logListContent" class="logListContent">
             <p style="text-align: center; color: var(--text2); padding: 1.5rem;">Memuat data log...</p>
         </div>
 
-        <!-- Kontainer Navigasi Paginasi -->
         <div id="logPaginationContainer" class="logPaginationContainer"></div>
     `;
 
     document.getElementById('btnCloseLogView')?.addEventListener('click', renderDefaultView);
 
-    // Event listener filter HTTP Method pada tabel aktif
+    // Filter listener: Reset ke halaman 1 saat filter berubah
     document.getElementById('logMethodFilter')?.addEventListener('change', (e) => {
-        const selectedMethod = e.target.value;
-        const rows = document.querySelectorAll('.logTable tbody tr');
-        
-        rows.forEach(row => {
-            const rowMethod = row.getAttribute('data-method');
-            if (selectedMethod === 'ALL' || rowMethod === selectedMethod) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+        currentMethodFilter = e.target.value;
+        currentLogPage = 1; // Reset ke halaman 1
+        fetchAndRenderLogs(currentLogPage, currentMethodFilter);
     });
 
-    // Ambil & Render Log Halaman Pertama
-    await fetchAndRenderLogs(currentLogPage);
+    await fetchAndRenderLogs(currentLogPage, currentMethodFilter);
 }
 
-async function fetchAndRenderLogs(page) {
+// Helper untuk menghasilkan array nomor halaman dinamis dengan ellipsis (...)
+function generatePaginationRange(currentPage, totalPages) {
+    const delta = 2; // Jumlah halaman di kiri & kanan halaman aktif
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+            range.push(i);
+        }
+    }
+
+    for (let i of range) {
+        if (l) {
+            if (i - l === 2) {
+                rangeWithDots.push(l + 1);
+            } else if (i - l !== 1) {
+                rangeWithDots.push('...');
+            }
+        }
+        rangeWithDots.push(i);
+        l = i;
+    }
+
+    return rangeWithDots;
+}
+
+async function fetchAndRenderLogs(page, method = 'ALL') {
     const logContent = document.getElementById('logListContent');
     const paginationContent = document.getElementById('logPaginationContainer');
 
@@ -354,26 +371,20 @@ async function fetchAndRenderLogs(page) {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/admin/logs?page=${page}&limit=${LOGS_PER_PAGE}`);
+        const response = await fetch(`${API_BASE}/admin/logs?page=${page}&limit=${LOGS_PER_PAGE}&method=${method}`);
         if (!response.ok) throw new Error('Gagal mengambil data log');
 
-        // Struktur respon expected: { logs: [...], totalPages: number, currentPage: number, totalLogs: number }
-        const data = await response.json();
-        
-        // Handling jika response array langsung (fallback) vs objek paginasi
-        const logs = Array.isArray(data) ? data : (data.logs || []);
-        const totalPages = data.totalPages || 1;
-        const currentPage = data.currentPage || page;
+        const { logs, totalPages, currentPage } = await response.json();
 
         if (!logContent) return;
 
-        if (logs.length === 0) {
+        if (!logs || logs.length === 0) {
             logContent.innerHTML = '<p style="text-align: center; padding: 1rem;">Belum ada riwayat aktivitas.</p>';
             if (paginationContent) paginationContent.innerHTML = '';
             return;
         }
 
-        // 1. Render Tabel Log
+        // 1. Render Tabel
         logContent.innerHTML = `
             <table class="logTable">
                 <thead>
@@ -399,52 +410,61 @@ async function fetchAndRenderLogs(page) {
             </table>
         `;
 
-        // 2. Render Tombol Paginasi
-    if (paginationContent) {
-        let pageButtons = '';
-        
-        // Generasi tombol angka halaman
-        for (let i = 1; i <= totalPages; i++) {
-            pageButtons += `
-                <button class="logPageBtn ${i === currentPage ? 'active' : ''}" data-page="${i}">
-                    ${i}
-                </button>
-            `;
-        }
+        // 2. Render Paginasi Dinamis
+        if (paginationContent) {
+            const pageRange = generatePaginationRange(currentPage, totalPages);
+            
+            const pageButtons = pageRange.map(item => {
+                if (item === '...') {
+                    return `<span class="logPageEllipsis">...</span>`;
+                }
+                return `
+                    <button class="logPageBtn ${item === currentPage ? 'active' : ''}" data-page="${item}">
+                        ${item}
+                    </button>
+                `;
+            }).join('');
 
-        paginationContent.innerHTML = `
-            <div class="logPaginationWrapper">
-                <button class="logPageBtn navBtn" id="btnPrevLog" ${currentPage <= 1 ? 'disabled' : ''} title="Halaman Sebelumnya">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
-                <div class="logPageNumbers">
-                    ${pageButtons}
+            paginationContent.innerHTML = `
+                <div class="logPaginationWrapper">
+                    <button class="logPageBtn navBtn" id="btnPrevLog" ${currentPage <= 1 ? 'disabled' : ''} title="Halaman Sebelumnya">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <div class="logPageNumbers">
+                        ${pageButtons}
+                    </div>
+                    <button class="logPageBtn navBtn" id="btnNextLog" ${currentPage >= totalPages ? 'disabled' : ''} title="Halaman Selanjutnya">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
                 </div>
-                <button class="logPageBtn navBtn" id="btnNextLog" ${currentPage >= totalPages ? 'disabled' : ''} title="Halaman Selanjutnya">
-                    <i class="fa-solid fa-chevron-right"></i>
-                </button>
-            </div>
-        `;
+            `;
 
-        // Event listener untuk tombol prev & next
-        document.getElementById('btnPrevLog')?.addEventListener('click', () => {
-            if (currentPage > 1) fetchAndRenderLogs(currentPage - 1);
-        });
-
-        document.getElementById('btnNextLog')?.addEventListener('click', () => {
-            if (currentPage < totalPages) fetchAndRenderLogs(currentPage + 1);
-        });
-
-        // Event listener untuk tombol angka halaman
-        document.querySelectorAll('.logPageNumbers .logPageBtn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const targetPage = parseInt(e.currentTarget.getAttribute('data-page'), 10);
-                if (targetPage !== currentPage) {
-                    fetchAndRenderLogs(targetPage);
+            // Event listener Navigasi Prev/Next
+            document.getElementById('btnPrevLog')?.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentLogPage = currentPage - 1;
+                    fetchAndRenderLogs(currentLogPage, currentMethodFilter);
                 }
             });
-        });
-    }
+
+            document.getElementById('btnNextLog')?.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentLogPage = currentPage + 1;
+                    fetchAndRenderLogs(currentLogPage, currentMethodFilter);
+                }
+            });
+
+            // Event listener tombol angka halaman
+            document.querySelectorAll('.logPageNumbers .logPageBtn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const targetPage = parseInt(e.currentTarget.getAttribute('data-page'), 10);
+                    if (targetPage !== currentPage) {
+                        currentLogPage = targetPage;
+                        fetchAndRenderLogs(currentLogPage, currentMethodFilter);
+                    }
+                });
+            });
+        }
     } catch (error) {
         console.error('Error loading activity logs:', error);
         if (logContent) {

@@ -18,16 +18,29 @@ export async function logActivity(req, action) {
     }
 }
 
-export async function getActivityLogs(page = 1, limit = 10) {
+export async function getActivityLogs(page = 1, limit = 10, method = 'ALL') {
     const offset = (page - 1) * limit;
+    const queryParams = [];
+    let whereClause = '';
 
-    // 1. Ambil total jumlah data log untuk kalkulasi total halaman
-    const countResult = await db.query(`SELECT COUNT(*) FROM activity_logs`);
+    // Kondisi filter method
+    if (method && method !== 'ALL') {
+        queryParams.push(method);
+        whereClause = `WHERE l.method = $${queryParams.length}`;
+    }
+
+    // 1. Hitung total data log berdasarkan filter
+    const countQuery = `SELECT COUNT(*) FROM activity_logs l ${whereClause}`;
+    const countResult = await db.query(countQuery, queryParams);
     const totalLogs = parseInt(countResult.rows[0].count, 10);
-    const totalPages = Math.ceil(totalLogs / limit);
+    const totalPages = Math.ceil(totalLogs / limit) || 1;
 
-    // 2. Ambil data log sesuai OFFSET & LIMIT
-    const { rows: logs } = await db.query(`
+    // 2. Query data log per halaman
+    const limitParamIndex = queryParams.length + 1;
+    const offsetParamIndex = queryParams.length + 2;
+    queryParams.push(limit, offset);
+
+    const dataQuery = `
         SELECT 
             l.id, 
             l.user_id AS "userId", 
@@ -40,9 +53,12 @@ export async function getActivityLogs(page = 1, limit = 10) {
             l.created_at AS "createdAt"
         FROM activity_logs l
         LEFT JOIN users u ON l.user_id = u.id
+        ${whereClause}
         ORDER BY l.created_at DESC
-        LIMIT $1 OFFSET $2
-    `, [limit, offset]);
+        LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
+    `;
+
+    const { rows: logs } = await db.query(dataQuery, queryParams);
 
     return {
         logs,

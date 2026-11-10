@@ -1135,6 +1135,11 @@
             "type": "string"
           },
           {
+            "name": "method",
+            "in": "query",
+            "type": "string"
+          },
+          {
             "name": "page",
             "in": "query",
             "type": "integer",
@@ -2020,6 +2025,11 @@
         "summary": "Mendapatkan log aktivitas sistem (Khusus ITAdmin)",
         "description": "Mengambil log aktivitas admin dengan paginasi.",
         "parameters": [
+          {
+            "name": "method",
+            "in": "query",
+            "type": "string"
+          },
           {
             "name": "page",
             "in": "query",

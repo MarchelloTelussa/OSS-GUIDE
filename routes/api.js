@@ -1256,8 +1256,9 @@ router.get('/admin/logs', requireAuth('ITAdmin'), async (req, res, next) => {
     try {
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 10;
+        const method = req.query.method || 'ALL';
 
-        const result = await getActivityLogs(page, limit);
+        const result = await getActivityLogs(page, limit, method);
         
         res.json(result);
     } catch (error) {

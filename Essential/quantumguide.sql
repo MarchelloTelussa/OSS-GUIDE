@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mrlPSFYiWdbhQlAhLZ1reZZNcpzqml2mDQ3lVmNeum9RpiR5Nt3rty7DR77Xilq
+\restrict Twn7tA0HlgfHhodKZ5rFP0DJnSC0yfA6QVDBLWlDZnMf8IebEYTGRmqgGYZ1NZl
 
 -- Dumped from database version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
@@ -211,6 +211,43 @@ ALTER SEQUENCE public.guide_steps_id_seq OWNED BY public.guide_steps.id;
 
 
 --
+-- Name: parent_slugs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.parent_slugs (
+    id integer NOT NULL,
+    slug character varying(50) NOT NULL,
+    title character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.parent_slugs OWNER TO postgres;
+
+--
+-- Name: parent_slugs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.parent_slugs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.parent_slugs_id_seq OWNER TO postgres;
+
+--
+-- Name: parent_slugs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.parent_slugs_id_seq OWNED BY public.parent_slugs.id;
+
+
+--
 -- Name: type; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -221,7 +258,7 @@ CREATE TABLE public.type (
     image_url text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    parent_slug character varying(20) DEFAULT 'web'::character varying NOT NULL
+    parent_slug_id integer NOT NULL
 );
 
 
@@ -313,6 +350,13 @@ ALTER TABLE ONLY public.guide_groups ALTER COLUMN id SET DEFAULT nextval('public
 --
 
 ALTER TABLE ONLY public.guide_steps ALTER COLUMN id SET DEFAULT nextval('public.guide_steps_id_seq'::regclass);
+
+
+--
+-- Name: parent_slugs id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.parent_slugs ALTER COLUMN id SET DEFAULT nextval('public.parent_slugs_id_seq'::regclass);
 
 
 --
@@ -474,6 +518,12 @@ COPY public.activity_logs (id, user_id, user_role, action, method, endpoint, ip_
 121	3	ITAdmin	Create Type baru: Email (ID: 12)	POST	/api/types	100.89.127.114	2026-11-04 17:01:46.818984
 122	3	ITAdmin	View Guide: "Logout" (ID: 13)	POST	/api/guides/13/view	100.89.127.114	2026-11-06 15:35:34.449809
 123	3	ITAdmin	View Guide: "Login" (ID: 5)	POST	/api/guides/5/view	::ffff:100.89.127.114	2026-11-09 16:17:38.903589
+124	3	ITAdmin	Create Group baru: "test" (ID: 25)	POST	/api/groups	100.89.127.114	2026-11-10 14:15:46.798135
+125	3	ITAdmin	Delete Group: "test" (ID: 25)	DELETE	/api/groups/25	100.89.127.114	2026-11-10 14:16:17.734905
+126	3	ITAdmin	View Guide: "test" (ID: 60)	POST	/api/guides/60/view	100.89.127.114	2026-11-10 17:07:52.896038
+127	3	ITAdmin	Delete Guide: "test" (ID: 60)	DELETE	/api/guides/60	100.89.127.114	2026-11-10 17:07:57.775542
+128	3	ITAdmin	View Guide: "Logout" (ID: 13)	POST	/api/guides/13/view	100.89.127.114	2026-11-11 09:51:22.782276
+129	3	ITAdmin	View Guide: "Logout" (ID: 13)	POST	/api/guides/13/view	::ffff:100.89.127.114	2026-11-11 16:54:47.345926
 \.
 
 
@@ -498,7 +548,7 @@ COPY public.guide (id, group_id, title, function_desc, important_note, video_url
 42	11	Login	Memperlihatkan cara untuk masuk ke OSS Mobile menggunakan akun HRIS.	Menekan tombol 'Ingat Saya' akan secara automatis mengisi username dan password akun ketika anda kembali masuk ke aplikasi.	/videos/oss_mobile/login/1792997137828.mp4	\N	5	2026-10-26 13:45:37.845808+07	2026-11-02 13:00:52.759741+07
 31	8	Stock Material	Panduan untuk stok material.	Menu monitoring Stok material.	/videos/oss_web/stock_material/1792565149238.mp4	\N	3	2026-10-21 13:45:49.247566+07	2026-11-02 13:46:05.433136+07
 2	2	Assign Work Order IKR	Panduan untuk melakukan assign teknisi pada Work Order IKR.	Gunakan filter untuk menemukan Work Order yang ingin diproses. Tombol reset digunakan untuk menghapus isi filter.	/videos/oss_web/assign_work_order_ikr/1792563718670.mp4	Video penjelasan perbaikan login VPN.	55	2026-10-20 16:48:31.387545+07	2026-11-02 13:45:33.147617+07
-13	10	Logout	Panduan untuk keluar dari akun OSS Web.	Pastikan ingat password untuk kembali masuk ke akun anda.	/videos/oss_web/logout/1792562586629.mp4	\N	18	2026-10-21 11:46:59.11144+07	2026-11-06 15:35:34.438236+07
+13	10	Logout	Panduan untuk keluar dari akun OSS Web.	Pastikan ingat password untuk kembali masuk ke akun anda.	/videos/oss_web/logout/1792562586629.mp4	\N	20	2026-10-21 11:46:59.11144+07	2026-11-11 16:54:47.34137+07
 16	1	Create Team Backbone	Panduan untuk membuat team yang akan digunakan dalam pengerjaan Work Order.	IKR, Backbone, Project merupakan tipe pekerjaan yang berbeda dan memerlukan tim yang berbeda juga	/videos/oss_web/create_team_backbone/1792562814724.mp4	\N	5	2026-10-21 13:06:54.742675+07	2026-11-02 13:50:26.465576+07
 15	1	Create Team IKR	Panduan untuk membuat team yang akan digunakan dalam pengerjaan Work Order IKR.	IKR, Backbone, Project merupakan tipe pekerjaan yang berbeda dan memerlukan tim yang berbeda juga	/videos/oss_web/create_team_ikr/1792562722163.mp4	\N	9	2026-10-21 13:05:22.175774+07	2026-11-02 17:31:10.483419+07
 28	8	Material Return	Panduan untuk mencatat material yang dikembalikan ke klien, melihat riwayat return, dan melakukan konfirmasi.	Gunakan rentang waktu atau nomor dokumen untuk menemukan data material return secara lebih spesifik.	/videos/oss_web/material_return/1792564801270.mp4	\N	1	2026-10-21 13:40:01.28179+07	2026-11-02 14:51:57.050835+07
@@ -510,7 +560,6 @@ COPY public.guide (id, group_id, title, function_desc, important_note, video_url
 26	8	Create & Assign Material ke Tim	Panduan untuk membuat package material dari material yang tersedia pada stok & Assign kepada Tim Teknisi.	Material harus tersedia pada stok sebelum dipilih untuk dibuat menjadi package.	/videos/oss_web/create___assign_material_ke_tim/1792564581084.mp4	\N	1	2026-10-21 13:36:21.093362+07	2026-10-30 11:46:52.471444+07
 36	2	Download foto IKR	Panduan untuk download foto yang diambil oleh teknisi selama mengerjakan Work Order IKR	-	/videos/oss_web/download_foto_ikr/1792746085372.mp4	\N	5	2026-10-23 15:58:51.442376+07	2026-10-23 16:01:25.631055+07
 48	11	Download Kamera Geotag	Panduan untuk mengunduh aplikasi kamera Geotag	Beberapa klien mengharuskan dokumentasi Work Order menggunakan aplikasi Geotag	/videos/oss_mobile/download_kamera_geotag/1792999068995.mp4	\N	3	2026-10-26 14:17:49.02073+07	2026-11-02 15:52:14.416249+07
-60	15	test	test	test	/videos/oss_web/test/1793676354387.mp4	\N	1	2026-11-03 10:25:54.412005+07	2026-11-03 10:25:55.53045+07
 32	9	Daftarkan Motor	Mendaftarkan data motor ke website sehingga dapat dipakai ketika membuat Tim.	Pada bagian tabel Sewa Motor, pengguna dapat menggunakan dropdown dibagian atas tabel untuk filter / mencari data motor yang sudah terdaftar.	/videos/oss_web/daftarkan_motor/1792565349879.mp4	\N	3	2026-10-21 13:49:09.889825+07	2026-11-04 15:20:23.098618+07
 5	10	Login	Panduan untuk masuk ke OSS Web dan mengenali halaman home serta menu aplikasi.	Pastikan memiliki akun HRIS yang aktif dan perangkat terhubung dengan internet sebelum menggunakan aplikasi.	/videos/oss_web/login/1792557172765.mp4	\N	31	2026-10-21 11:10:09.348755+07	2026-11-09 16:17:38.882858+07
 \.
@@ -718,7 +767,17 @@ COPY public.guide_steps (id, guide_id, step_order, step_description, created_at)
 268	52	2	Klik tombol 'Absen out	2026-10-27 14:37:34.624177+07
 269	52	3	Ambil foto wajab	2026-10-27 14:37:34.624177+07
 270	52	4	Klik tombol 'Submit'	2026-10-27 14:37:34.624177+07
-283	60	1	test	2026-11-03 10:25:54.412005+07
+\.
+
+
+--
+-- Data for Name: parent_slugs; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.parent_slugs (id, slug, title, created_at, updated_at) FROM stdin;
+1	email	Email	2026-11-13 09:47:20.929215+07	2026-11-13 09:47:20.929215+07
+2	web	Web	2026-11-13 09:47:20.929215+07	2026-11-13 09:47:20.929215+07
+3	mobile	Mobile	2026-11-13 09:47:20.929215+07	2026-11-13 09:47:20.929215+07
 \.
 
 
@@ -726,14 +785,14 @@ COPY public.guide_steps (id, guide_id, step_order, step_description, created_at)
 -- Data for Name: type; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.type (id, title, description, image_url, created_at, updated_at, parent_slug) FROM stdin;
-1	OSS WEB	OSS (Operation Support System) Web adalah aplikasi manajemen operasional berbasis website milik PT Quantum Nusatama yang dirancang untuk mendukung dan mengoptimalkan proses kerja inti perusahaan. Terintegrasi langsung dengan sistem HRIS, platform ini berfungsi sebagai pusat kendali (control center) untuk mencatat, mengelola, melacak, dan menyelesaikan berbagai permintaan pengerjaan (Work Order) dari client secara terstruktur dan real-time.	/img/oss_web/img_1792555546105.png	2026-10-20 16:48:31.387545+07	2026-10-26 10:22:25.804777+07	web
-4	PM Tracker			2026-10-23 10:57:01.804501+07	2026-10-23 10:57:01.804501+07	web
-6	Mapping			2026-10-23 10:57:21.450651+07	2026-10-23 10:57:21.450651+07	web
-2	OSS MOBILE	OSS Mobile adalah aplikasi pendukung operasional berbasis smartphone milik PT Quantum Nusatama yang memfasilitasi kebutuhan kerja harian dan pengerjaan lapangan para teknisi secara terintegrasi. Aplikasi ini memuat fitur manajemen kehadiran (absensi shift), pengajuan formulir SDM, pengunduhan e-slip gaji, hingga eksekusi Work Order (IKR, Backbone, Project) secara real-time dengan dukungan upload foto geotagging/timestamp serta pencatatan koordinat lokasi. Selain itu, OSS Mobile juga menyederhanakan pengelolaan material lapangan melalui pencatatan penggunaan barang, konfirmasi penerimaan/retur, serta fitur pemindaian QR Code untuk transfer material antarteknisi secara praktis.	/img/oss_mobile/img_1792565970299.jpg	2026-10-20 16:48:31.387545+07	2026-10-23 11:01:48.368177+07	mobile
-9	HRIS	HRIS (Human Resources Information System) adalah platform manajemen sumber daya manusia berbasis web terintegrasi yang dirancang khusus untuk mengotomatisasi dan menyederhanakan seluruh administrasi kepegawaian di PT Quantum Nusatama secara terpusat, mulai dari pengelolaan database karyawan, pencatatan absensi digital, hingga sistem pengajuan cuti dan justifikasi kehadiran secara real-time.	/img/hris/img_1793781911446.png	2026-10-26 17:14:03.572264+07	2026-11-04 15:48:22.90041+07	web
-5	Heatmap	Heatmap merupakan dasbor monitoring berbasis peta digital yang berfungsi untuk melacak, memetakan, dan mengelola tiket gangguan (Trouble Ticket) jaringan fiber optik secara real-time di berbagai wilayah operasional Indonesia. Sistem ini mengintegrasikan visualisasi sebaran lokasi gangguan pada peta interaktif dengan panel kontrol status operasional—seperti jumlah tiket yang belum ditangani (Not Yet Handled), sedang diproses (Progress), maupun yang sudah selesai (Done).	/img/heatmap/img_1793783187348.png	2026-10-23 10:57:10.046231+07	2026-11-04 16:31:20.939061+07	web
-12	Email			2026-11-04 17:01:46.816481+07	2026-11-04 17:01:46.816481+07	email
+COPY public.type (id, title, description, image_url, created_at, updated_at, parent_slug_id) FROM stdin;
+12	Email			2026-11-04 17:01:46.816481+07	2026-11-13 09:49:09.497338+07	1
+5	Heatmap	Heatmap merupakan dasbor monitoring berbasis peta digital yang berfungsi untuk melacak, memetakan, dan mengelola tiket gangguan (Trouble Ticket) jaringan fiber optik secara real-time di berbagai wilayah operasional Indonesia. Sistem ini mengintegrasikan visualisasi sebaran lokasi gangguan pada peta interaktif dengan panel kontrol status operasional—seperti jumlah tiket yang belum ditangani (Not Yet Handled), sedang diproses (Progress), maupun yang sudah selesai (Done).	/img/heatmap/img_1793783187348.png	2026-10-23 10:57:10.046231+07	2026-11-13 09:49:09.497338+07	2
+9	HRIS	HRIS (Human Resources Information System) adalah platform manajemen sumber daya manusia berbasis web terintegrasi yang dirancang khusus untuk mengotomatisasi dan menyederhanakan seluruh administrasi kepegawaian di PT Quantum Nusatama secara terpusat, mulai dari pengelolaan database karyawan, pencatatan absensi digital, hingga sistem pengajuan cuti dan justifikasi kehadiran secara real-time.	/img/hris/img_1793781911446.png	2026-10-26 17:14:03.572264+07	2026-11-13 09:49:09.497338+07	2
+6	Mapping			2026-10-23 10:57:21.450651+07	2026-11-13 09:49:09.497338+07	2
+4	PM Tracker			2026-10-23 10:57:01.804501+07	2026-11-13 09:49:09.497338+07	2
+1	OSS WEB	OSS (Operation Support System) Web adalah aplikasi manajemen operasional berbasis website milik PT Quantum Nusatama yang dirancang untuk mendukung dan mengoptimalkan proses kerja inti perusahaan. Terintegrasi langsung dengan sistem HRIS, platform ini berfungsi sebagai pusat kendali (control center) untuk mencatat, mengelola, melacak, dan menyelesaikan berbagai permintaan pengerjaan (Work Order) dari client secara terstruktur dan real-time.	/img/oss_web/img_1792555546105.png	2026-10-20 16:48:31.387545+07	2026-11-13 09:49:09.497338+07	2
+2	OSS MOBILE	OSS Mobile adalah aplikasi pendukung operasional berbasis smartphone milik PT Quantum Nusatama yang memfasilitasi kebutuhan kerja harian dan pengerjaan lapangan para teknisi secara terintegrasi. Aplikasi ini memuat fitur manajemen kehadiran (absensi shift), pengajuan formulir SDM, pengunduhan e-slip gaji, hingga eksekusi Work Order (IKR, Backbone, Project) secara real-time dengan dukungan upload foto geotagging/timestamp serta pencatatan koordinat lokasi. Selain itu, OSS Mobile juga menyederhanakan pengelolaan material lapangan melalui pencatatan penggunaan barang, konfirmasi penerimaan/retur, serta fitur pemindaian QR Code untuk transfer material antarteknisi secara praktis.	/img/oss_mobile/img_1792565970299.jpg	2026-10-20 16:48:31.387545+07	2026-11-13 09:49:09.497338+07	3
 \.
 
 
@@ -746,7 +805,7 @@ COPY public.users (id, username, password, role, created_at, token_version) FROM
 7	user2	scrypt$16384$8$1$QWbRZiIOV7ee/d1T0dgS5g==$ESeb5yPxdn+SXr58NeUIWjgFmjle7tUODx2IDiJM+xqm9k453YX57gmrR6vEJZ3YAkUZXz7uphrxZDAbXjGgjA==	user	2026-10-23 08:43:16.052445+07	0
 8	user3	scrypt$16384$8$1$/nihto+UuUPJsPEsBxfYpw==$bTu7wjL82YwV217ihWe/fmoA6ydH5jOhznnThuX9QfroIVVl6+VCEG/PO9dH0ucMzuniE6UlprFfp9ELucsVbA==	user	2026-10-23 08:43:20.197014+07	0
 6	ITAdmin3	scrypt$16384$8$1$ir5/7HMSpixWnYLHMw1XWg==$jQNg49/w1FcZYq+YyXxBmDMEjfvJMll4f2Onvvj5+5ak2SKLLFThCBTwIq//qEbXUixWgx7sAEiPnuoyahjjqA==	ITAdmin	2026-10-23 08:42:58.020122+07	2
-3	ITAdmin	scrypt$16384$8$1$IxGfeDt6ymGZsPIuVi+G5g==$U0JrzPSgNnuWos1AV8ywy8LLlsbcnC8P3L50IPDE+8b93xOVSTHmA/jvoE6ZPdoj00i+EBOYCQdgeeuq1ACM2A==	ITAdmin	2026-10-20 17:01:59.692116+07	49
+3	ITAdmin	scrypt$16384$8$1$IxGfeDt6ymGZsPIuVi+G5g==$U0JrzPSgNnuWos1AV8ywy8LLlsbcnC8P3L50IPDE+8b93xOVSTHmA/jvoE6ZPdoj00i+EBOYCQdgeeuq1ACM2A==	ITAdmin	2026-10-20 17:01:59.692116+07	51
 4	user	scrypt$16384$8$1$hoKqy9wcyR7eJRTgQPu5tA==$LuFWV2Tj0UfZwKLpxEZCs+aeSqS86OKKS6HC7AFKHUEABJx8n2CfoQxZk/W9MPX0QXHVbzPFR06LnmqCz9b0yg==	user	2026-10-21 10:18:08.750786+07	7
 \.
 
@@ -769,14 +828,14 @@ SELECT pg_catalog.setval('cron.runid_seq', 1, false);
 -- Name: activity_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.activity_logs_id_seq', 123, true);
+SELECT pg_catalog.setval('public.activity_logs_id_seq', 129, true);
 
 
 --
 -- Name: guide_groups_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.guide_groups_id_seq', 24, true);
+SELECT pg_catalog.setval('public.guide_groups_id_seq', 25, true);
 
 
 --
@@ -791,6 +850,13 @@ SELECT pg_catalog.setval('public.guide_id_seq', 63, true);
 --
 
 SELECT pg_catalog.setval('public.guide_steps_id_seq', 286, true);
+
+
+--
+-- Name: parent_slugs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.parent_slugs_id_seq', 3, true);
 
 
 --
@@ -837,6 +903,22 @@ ALTER TABLE ONLY public.guide
 
 ALTER TABLE ONLY public.guide_steps
     ADD CONSTRAINT guide_steps_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: parent_slugs parent_slugs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.parent_slugs
+    ADD CONSTRAINT parent_slugs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: parent_slugs parent_slugs_slug_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.parent_slugs
+    ADD CONSTRAINT parent_slugs_slug_key UNIQUE (slug);
 
 
 --
@@ -906,6 +988,13 @@ CREATE INDEX idx_guide_video_url ON public.guide USING btree (video_url) WHERE (
 
 
 --
+-- Name: idx_type_parent_slug_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_type_parent_slug_id ON public.type USING btree (parent_slug_id);
+
+
+--
 -- Name: guide_groups trg_update_guide_groups_timestamp; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -917,6 +1006,13 @@ CREATE TRIGGER trg_update_guide_groups_timestamp BEFORE UPDATE ON public.guide_g
 --
 
 CREATE TRIGGER trg_update_guide_timestamp BEFORE UPDATE ON public.guide FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
+
+
+--
+-- Name: parent_slugs trg_update_parent_slugs_timestamp; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_update_parent_slugs_timestamp BEFORE UPDATE ON public.parent_slugs FOR EACH ROW EXECUTE FUNCTION public.update_timestamp();
 
 
 --
@@ -956,6 +1052,14 @@ ALTER TABLE ONLY public.guide_groups
 
 ALTER TABLE ONLY public.guide_steps
     ADD CONSTRAINT guide_steps_guide_id_fkey FOREIGN KEY (guide_id) REFERENCES public.guide(id) ON DELETE CASCADE;
+
+
+--
+-- Name: type type_parent_slug_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.type
+    ADD CONSTRAINT type_parent_slug_id_fkey FOREIGN KEY (parent_slug_id) REFERENCES public.parent_slugs(id) ON DELETE CASCADE;
 
 
 --
@@ -1015,6 +1119,20 @@ GRANT ALL ON SEQUENCE public.guide_steps_id_seq TO quantum;
 
 
 --
+-- Name: TABLE parent_slugs; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.parent_slugs TO quantum;
+
+
+--
+-- Name: SEQUENCE parent_slugs_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.parent_slugs_id_seq TO quantum;
+
+
+--
 -- Name: TABLE type; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -1060,5 +1178,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mrlPSFYiWdbhQlAhLZ1reZZNcpzqml2mDQ3lVmNeum9RpiR5Nt3rty7DR77Xilq
+\unrestrict Twn7tA0HlgfHhodKZ5rFP0DJnSC0yfA6QVDBLWlDZnMf8IebEYTGRmqgGYZ1NZl
 

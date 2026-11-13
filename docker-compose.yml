@@ -28,7 +28,7 @@ services:
       - ./init-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
       - ./Essential/quantumguide.sql:/docker-entrypoint-initdb.d/02-quantumguide.sql
     ports:
-      - "127.0.0.1:5432:5432"  # Hanya mengizinkan akses DB dari internal server (Aman!)
+      - "127.0.0.1:5433:5432"  # Hanya mengizinkan akses DB dari internal server (Aman!)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d quantumguide"]
       interval: 5s

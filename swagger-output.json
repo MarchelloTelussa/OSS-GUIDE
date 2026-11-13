@@ -161,13 +161,191 @@
         }
       }
     },
+    "/api/parent-slugs": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "cookie",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "cookie",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "example": "any"
+                },
+                "slug": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/parent-slugs/{identifier}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "cookie",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/parent-slugs/{id}": {
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "cookie",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "example": "any"
+                },
+                "slug": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Parent Slugs"
+        ],
+        "summary": "Hapus Parent Slug (Khusus ITAdmin)",
+        "description": "Menghapus Parent Slug beserta seluruh Type, Guide Group, Guide, dan file media di bawahnya.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "ID Parent Slug yang dihapus"
+          },
+          {
+            "name": "cookie",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parent Slug berhasil dihapus"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Parent Slug tidak ditemukan"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/types": {
       "get": {
         "tags": [
           "Types"
         ],
         "summary": "Mendapatkan semua kategori Type",
-        "description": "Mengambil seluruh daftar Type panduan beserta metadata image dan slug.",
+        "description": "Mengambil seluruh daftar Type panduan beserta metadata image dan parent slug.",
         "parameters": [
           {
             "name": "cookie",
@@ -187,9 +365,17 @@
                     "type": "number",
                     "example": 1
                   },
+                  "parentSlugId": {
+                    "type": "number",
+                    "example": 1
+                  },
                   "parentSlug": {
                     "type": "string",
                     "example": "web"
+                  },
+                  "parentTitle": {
+                    "type": "string",
+                    "example": "Web"
                   },
                   "title": {
                     "type": "string",
@@ -230,11 +416,15 @@
           {
             "name": "body",
             "in": "body",
-            "description": "Data Type baru",
+            "description": "Data Type baru (bisa kirim parentSlugId atau parentSlug)",
             "required": true,
             "schema": {
               "type": "object",
               "properties": {
+                "parentSlugId": {
+                  "type": "number",
+                  "example": 1
+                },
                 "parentSlug": {
                   "type": "string",
                   "example": "web"
@@ -253,7 +443,6 @@
                 }
               },
               "required": [
-                "parentSlug",
                 "title"
               ]
             }
@@ -264,7 +453,7 @@
             "description": "Type berhasil dibuat"
           },
           "400": {
-            "description": "Title wajib diisi / Duplicate title"
+            "description": "Title wajib diisi / Parent slug tidak valid / Duplicate title"
           },
           "401": {
             "description": "Unauthorized"
@@ -339,6 +528,10 @@
             "schema": {
               "type": "object",
               "properties": {
+                "parentSlugId": {
+                  "type": "number",
+                  "example": 1
+                },
                 "parentSlug": {
                   "type": "string",
                   "example": "web"
@@ -357,7 +550,6 @@
                 }
               },
               "required": [
-                "parentSlug",
                 "title"
               ]
             }
@@ -368,7 +560,7 @@
             "description": "Type berhasil diperbarui"
           },
           "400": {
-            "description": "Bad Request"
+            "description": "Parent slug tidak valid / Duplicate title"
           },
           "401": {
             "description": "Unauthorized"
@@ -1170,13 +1362,158 @@
         ]
       }
     },
+    "/parent-slugs": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "example": "any"
+                },
+                "slug": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/parent-slugs/{identifier}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/parent-slugs/{id}": {
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "example": "any"
+                },
+                "slug": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Parent Slugs"
+        ],
+        "summary": "Hapus Parent Slug (Khusus ITAdmin)",
+        "description": "Menghapus Parent Slug beserta seluruh Type, Guide Group, Guide, dan file media di bawahnya.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "ID Parent Slug yang dihapus"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parent Slug berhasil dihapus"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Parent Slug tidak ditemukan"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/types": {
       "get": {
         "tags": [
           "Types"
         ],
         "summary": "Mendapatkan semua kategori Type",
-        "description": "Mengambil seluruh daftar Type panduan beserta metadata image dan slug.",
+        "description": "Mengambil seluruh daftar Type panduan beserta metadata image dan parent slug.",
         "responses": {
           "200": {
             "description": "Berhasil mendapatkan daftar Type.",
@@ -1189,9 +1526,17 @@
                     "type": "number",
                     "example": 1
                   },
+                  "parentSlugId": {
+                    "type": "number",
+                    "example": 1
+                  },
                   "parentSlug": {
                     "type": "string",
                     "example": "web"
+                  },
+                  "parentTitle": {
+                    "type": "string",
+                    "example": "Web"
                   },
                   "title": {
                     "type": "string",
@@ -1224,11 +1569,15 @@
           {
             "name": "body",
             "in": "body",
-            "description": "Data Type baru",
+            "description": "Data Type baru (bisa kirim parentSlugId atau parentSlug)",
             "required": true,
             "schema": {
               "type": "object",
               "properties": {
+                "parentSlugId": {
+                  "type": "number",
+                  "example": 1
+                },
                 "parentSlug": {
                   "type": "string",
                   "example": "web"
@@ -1247,7 +1596,6 @@
                 }
               },
               "required": [
-                "parentSlug",
                 "title"
               ]
             }
@@ -1258,7 +1606,7 @@
             "description": "Type berhasil dibuat"
           },
           "400": {
-            "description": "Title wajib diisi / Duplicate title"
+            "description": "Title wajib diisi / Parent slug tidak valid / Duplicate title"
           },
           "401": {
             "description": "Unauthorized"
@@ -1320,6 +1668,10 @@
             "schema": {
               "type": "object",
               "properties": {
+                "parentSlugId": {
+                  "type": "number",
+                  "example": 1
+                },
                 "parentSlug": {
                   "type": "string",
                   "example": "web"
@@ -1338,7 +1690,6 @@
                 }
               },
               "required": [
-                "parentSlug",
                 "title"
               ]
             }
@@ -1349,7 +1700,7 @@
             "description": "Type berhasil diperbarui"
           },
           "400": {
-            "description": "Bad Request"
+            "description": "Parent slug tidak valid / Duplicate title"
           },
           "401": {
             "description": "Unauthorized"

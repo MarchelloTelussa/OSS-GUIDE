@@ -23,6 +23,13 @@ const router = express.Router();
 // Synchronize concurrent write/delete tasks per guide
 const taskLocks = new Map();
 
+const generateSlug = (text) => {
+    return cleanText(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
+
 function enqueueTask(key, taskFn) {
     const lockKey = String(key);
     const previousTask = taskLocks.get(lockKey) || Promise.resolve();
@@ -127,6 +134,197 @@ function parseMultipartBuffer(buffer, boundary) {
 }
 
 // =============================================================
+// 0. PARENT SLUG ROUTES (CRUD)
+// =============================================================
+
+// GET all parent slugs
+router.get('/parent-slugs', async (req, res, next) => {
+    try {
+        const queryText = `
+            SELECT 
+                ps.id, 
+                ps.slug, 
+                ps.title, 
+                ps.created_at, 
+                ps.updated_at,
+                COUNT(t.id)::int AS "typeCount"
+            FROM parent_slugs ps
+            LEFT JOIN type t ON t.parent_slug_id = ps.id
+            GROUP BY ps.id
+            ORDER BY ps.id ASC;
+        `;
+        const { rows } = await db.query(queryText);
+        res.json(rows);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GET single parent slug by ID or slug
+router.get('/parent-slugs/:identifier', async (req, res, next) => {
+    const { identifier } = req.params;
+    const isNumericId = /^\d+$/.test(identifier);
+
+    try {
+        const queryText = `
+            SELECT 
+                ps.id, 
+                ps.slug, 
+                ps.title,
+                COALESCE(
+                    (
+                        SELECT json_agg(
+                            json_build_object(
+                                'id', t.id,
+                                'title', t.title,
+                                'description', t.description,
+                                'imgUrl', t.image_url
+                            ) ORDER BY t.id ASC
+                        )
+                        FROM type t
+                        WHERE t.parent_slug_id = ps.id
+                    ),
+                    '[]'::json
+                ) AS types
+            FROM parent_slugs ps
+            WHERE ${isNumericId ? 'ps.id = $1' : 'ps.slug = $1'};
+        `;
+        const { rows } = await db.query(queryText, [isNumericId ? parseInt(identifier, 10) : identifier.toLowerCase()]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Parent slug not found' });
+        }
+        res.json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST create parent slug (ITAdmin only)
+router.post('/parent-slugs', requireAuth('ITAdmin'), async (req, res, next) => {
+    try {
+        const { title, slug } = req.body;
+        const sanitizedTitle = cleanText(title);
+
+        if (!sanitizedTitle) {
+            return res.status(400).json({ error: 'Title field is required' });
+        }
+
+        const finalSlug = generateSlug(slug || sanitizedTitle);
+        if (!finalSlug) {
+            return res.status(400).json({ error: 'Slug tidak valid' });
+        }
+
+        const checkDuplicate = await db.query(
+            `SELECT id FROM parent_slugs WHERE slug = $1 OR LOWER(TRIM(title)) = LOWER(TRIM($2))`,
+            [finalSlug, sanitizedTitle]
+        );
+        if (checkDuplicate.rows.length > 0) {
+            return res.status(400).json({ error: `Parent slug "${finalSlug}" atau title "${sanitizedTitle}" sudah ada.` });
+        }
+
+        const queryText = `
+            INSERT INTO parent_slugs (slug, title)
+            VALUES ($1, $2)
+            RETURNING id, slug, title, created_at, updated_at;
+        `;
+        const { rows } = await db.query(queryText, [finalSlug, sanitizedTitle]);
+
+        await logActivity(req, `Create Parent Slug baru: ${rows[0].title} (${rows[0].slug}, ID: ${rows[0].id})`);
+        res.status(201).json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// PUT update parent slug (ITAdmin only)
+router.put('/parent-slugs/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    const { id } = req.params;
+    const { title, slug } = req.body;
+    const sanitizedTitle = cleanText(title);
+
+    if (!sanitizedTitle) {
+        return res.status(400).json({ error: 'Title field is required' });
+    }
+
+    const finalSlug = generateSlug(slug || sanitizedTitle);
+    if (!finalSlug) {
+        return res.status(400).json({ error: 'Slug tidak valid' });
+    }
+
+    try {
+        const oldRes = await db.query('SELECT title, slug FROM parent_slugs WHERE id = $1', [id]);
+        if (oldRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Parent slug not found' });
+        }
+
+        const checkDuplicate = await db.query(
+            `SELECT id FROM parent_slugs WHERE (slug = $1 OR LOWER(TRIM(title)) = LOWER(TRIM($2))) AND id != $3`,
+            [finalSlug, sanitizedTitle, id]
+        );
+        if (checkDuplicate.rows.length > 0) {
+            return res.status(400).json({ error: `Parent slug "${finalSlug}" atau title "${sanitizedTitle}" sudah digunakan.` });
+        }
+
+        const queryText = `
+            UPDATE parent_slugs
+            SET slug = $1, title = $2
+            WHERE id = $3
+            RETURNING id, slug, title, created_at, updated_at;
+        `;
+        const { rows } = await db.query(queryText, [finalSlug, sanitizedTitle, id]);
+
+        await logActivity(req, `Update Parent Slug: "${oldRes.rows[0].title}" menjadi "${rows[0].title}" (ID: ${rows[0].id})`);
+        res.json(rows[0]);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// DELETE parent slug (ITAdmin only)
+router.delete('/parent-slugs/:id', requireAuth('ITAdmin'), async (req, res, next) => {
+    /* 
+        #swagger.tags = ['Parent Slugs']
+        #swagger.summary = 'Hapus Parent Slug (Khusus ITAdmin)'
+        #swagger.description = 'Menghapus Parent Slug beserta seluruh Type, Guide Group, Guide, dan file media di bawahnya.'
+        #swagger.security = [{ "bearerAuth": [] }]
+        #swagger.parameters['id'] = { description: 'ID Parent Slug yang dihapus' }
+        #swagger.responses[200] = { description: 'Parent Slug berhasil dihapus' }
+        #swagger.responses[404] = { description: 'Parent Slug tidak ditemukan' }
+    */
+    const { id } = req.params;
+    try {
+        const parentRes = await db.query('SELECT title, slug FROM parent_slugs WHERE id = $1', [id]);
+        if (parentRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Parent slug not found' });
+        }
+
+        const { title, slug } = parentRes.rows[0];
+
+        // Ambil semua Type di bawah Parent Slug ini untuk pembersihan folder fisik
+        const typesRes = await db.query('SELECT title, image_url FROM type WHERE parent_slug_id = $1', [id]);
+
+        // DELETE parent_slugs otomatis cascade menghapus type -> guide_groups -> guide -> guide_steps
+        await db.query('DELETE FROM parent_slugs WHERE id = $1', [id]);
+
+        // Bersihkan file & folder fisik milik setiap Type yang ikut terhapus
+        typesRes.rows.forEach(t => {
+            if (t.image_url) cleanupFileAndParentDir(t.image_url);
+            const safeTypeFolder = sanitizeFolderName(t.title);
+            const imgTypeDir = path.join(__dirname, '../public/img', safeTypeFolder);
+            const videoTypeDir = path.join(__dirname, '../public/videos', safeTypeFolder);
+
+            if (fs.existsSync(imgTypeDir)) fs.rmSync(imgTypeDir, { recursive: true, force: true });
+            if (fs.existsSync(videoTypeDir)) fs.rmSync(videoTypeDir, { recursive: true, force: true });
+        });
+
+        await logActivity(req, `Delete Parent Slug: "${title}" (${slug}, ID: ${id})`);
+        res.json({ message: 'Parent slug successfully deleted', deletedId: id });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// =============================================================
 // 1. TYPE ROUTES (CRUD)
 // =============================================================
 
@@ -135,17 +333,27 @@ router.get('/types', async (req, res, next) => {
     /* 
         #swagger.tags = ['Types']
         #swagger.summary = 'Mendapatkan semua kategori Type'
-        #swagger.description = 'Mengambil seluruh daftar Type panduan beserta metadata image dan slug.'
+        #swagger.description = 'Mengambil seluruh daftar Type panduan beserta metadata image dan parent slug.'
         #swagger.responses[200] = {
             description: 'Berhasil mendapatkan daftar Type.',
-            schema: [{ id: 1, parentSlug: 'web', title: 'Web App', description: 'Panduan Web', imgUrl: '/img/web/img_1.png' }]
+            schema: [{ id: 1, parentSlugId: 1, parentSlug: 'web', parentTitle: 'Web', title: 'Web App', description: 'Panduan Web', imgUrl: '/img/web/img_1.png' }]
         }
     */
     try {
         const queryText = `
-            SELECT id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl", created_at, updated_at
-            FROM type
-            ORDER BY id ASC;
+            SELECT 
+                t.id, 
+                t.parent_slug_id AS "parentSlugId",
+                ps.slug AS "parentSlug", 
+                ps.title AS "parentTitle",
+                t.title, 
+                t.description, 
+                t.image_url AS "imgUrl", 
+                t.created_at, 
+                t.updated_at
+            FROM type t
+            JOIN parent_slugs ps ON t.parent_slug_id = ps.id
+            ORDER BY t.id ASC;
         `;
         const { rows } = await db.query(queryText);
         res.json(rows);
@@ -169,7 +377,9 @@ router.get('/types/:id', async (req, res, next) => {
         const queryText = `
             SELECT 
                 t.id, 
-                t.parent_slug AS "parentSlug",
+                t.parent_slug_id AS "parentSlugId",
+                ps.slug AS "parentSlug",
+                ps.title AS "parentTitle",
                 t.title, 
                 t.description, 
                 t.image_url AS "imgUrl",
@@ -189,6 +399,7 @@ router.get('/types/:id', async (req, res, next) => {
                     '[]'::json
                 ) AS groups
             FROM type t
+            JOIN parent_slugs ps ON t.parent_slug_id = ps.id
             WHERE t.id = $1;
         `;
         const { rows } = await db.query(queryText, [id]);
@@ -201,6 +412,19 @@ router.get('/types/:id', async (req, res, next) => {
     }
 });
 
+// Helper untuk resolve parent_slug_id dari parentSlugId (integer) atau parentSlug (string)
+async function resolveParentSlug(dbOrClient, { parentSlugId, parentSlug }) {
+    if (parentSlugId !== undefined && parentSlugId !== null && parentSlugId !== '') {
+        const res = await dbOrClient.query('SELECT id, slug, title FROM parent_slugs WHERE id = $1', [parentSlugId]);
+        return res.rows[0] || null;
+    }
+    if (parentSlug) {
+        const res = await dbOrClient.query('SELECT id, slug, title FROM parent_slugs WHERE slug = $1', [String(parentSlug).toLowerCase().trim()]);
+        return res.rows[0] || null;
+    }
+    return null;
+}
+
 // POST create type (ITAdmin only)
 router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
     /* 
@@ -209,21 +433,22 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
         #swagger.security = [{ "bearerAuth": [] }]
         #swagger.parameters['body'] = {
             in: 'body',
-            description: 'Data Type baru',
+            description: 'Data Type baru (bisa kirim parentSlugId atau parentSlug)',
             required: true,
             schema: {
-                $parentSlug: 'web',
+                parentSlugId: 1,
+                parentSlug: 'web',
                 $title: 'Frontend Vue.js',
                 description: 'Panduan pengembangan aplikasi frontend Vue',
                 imgUrl: '/img/frontend_vue.png'
             }
         }
         #swagger.responses[201] = { description: 'Type berhasil dibuat' }
-        #swagger.responses[400] = { description: 'Title wajib diisi / Duplicate title' }
+        #swagger.responses[400] = { description: 'Title wajib diisi / Parent slug tidak valid / Duplicate title' }
         #swagger.responses[401] = { description: 'Unauthorized' }
     */
     try {
-        const { parentSlug, title, description, imgUrl } = req.body;
+        const { parentSlugId, parentSlug, title, description, imgUrl } = req.body;
         const sanitizedTitle = cleanText(title);
         const sanitizedDesc = cleanRichText(description || '');
 
@@ -231,7 +456,10 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
             return res.status(400).json({ error: 'Title field is required' });
         }
 
-        const validParentSlug = parentSlug && ['web', 'mobile', 'email'].includes(parentSlug) ? parentSlug : 'web';
+        const parentRecord = await resolveParentSlug(db, { parentSlugId, parentSlug });
+        if (!parentRecord) {
+            return res.status(400).json({ error: 'Parent slug tidak valid atau tidak ditemukan.' });
+        }
 
         const checkDuplicate = await db.query(
             `SELECT id FROM type 
@@ -244,18 +472,25 @@ router.post('/types', requireAuth('ITAdmin'), async (req, res, next) => {
         }
 
         const queryText = `
-            INSERT INTO type (parent_slug, title, description, image_url)
+            INSERT INTO type (parent_slug_id, title, description, image_url)
             VALUES ($1, $2, $3, $4)
-            RETURNING id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl";
+            RETURNING id, parent_slug_id AS "parentSlugId", title, description, image_url AS "imgUrl";
         `;
         const { rows } = await db.query(queryText, [
-            validParentSlug,
+            parentRecord.id,
             sanitizedTitle,
             sanitizedDesc,
             imgUrl || ''
         ]);
-        await logActivity(req, `Create Type baru: ${rows[0].title} (ID: ${rows[0].id})`);
-        res.status(201).json(rows[0]);
+
+        const responseData = {
+            ...rows[0],
+            parentSlug: parentRecord.slug,
+            parentTitle: parentRecord.title
+        };
+
+        await logActivity(req, `Create Type baru: ${responseData.title} (ID: ${responseData.id})`);
+        res.status(201).json(responseData);
     } catch (error) {
         next(error);
     }
@@ -272,17 +507,19 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             in: 'body',
             required: true,
             schema: {
-                $parentSlug: 'web',
+                parentSlugId: 1,
+                parentSlug: 'web',
                 $title: 'Frontend Nuxt 3',
                 description: 'Panduan updated',
                 imgUrl: '/img/nuxt.png'
             }
         }
         #swagger.responses[200] = { description: 'Type berhasil diperbarui' }
+        #swagger.responses[400] = { description: 'Parent slug tidak valid / Duplicate title' }
         #swagger.responses[404] = { description: 'Type tidak ditemukan' }
     */
     const { id } = req.params;
-    const { parentSlug, title, description, imgUrl } = req.body;
+    const { parentSlugId, parentSlug, title, description, imgUrl } = req.body;
 
     const sanitizedTitle = cleanText(title);
     const sanitizedDesc = cleanRichText(description || '');
@@ -290,8 +527,6 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     if (!sanitizedTitle) {
         return res.status(400).json({ error: 'Title field is required' });
     }
-
-    const validParentSlug = parentSlug && ['web', 'mobile', 'email'].includes(parentSlug) ? parentSlug : 'web';
 
     try {
         const checkDuplicate = await db.query(
@@ -311,6 +546,12 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
+
+        const parentRecord = await resolveParentSlug(client, { parentSlugId, parentSlug });
+        if (!parentRecord) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Parent slug tidak valid atau tidak ditemukan.' });
+        }
 
         const oldTypeRes = await client.query('SELECT title, image_url FROM type WHERE id = $1', [id]);
         if (oldTypeRes.rows.length === 0) {
@@ -369,12 +610,12 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         const updateTypeQuery = `
             UPDATE type
-            SET parent_slug = $1, title = $2, description = $3, image_url = $4
+            SET parent_slug_id = $1, title = $2, description = $3, image_url = $4
             WHERE id = $5
-            RETURNING id, parent_slug AS "parentSlug", title, description, image_url AS "imgUrl";
+            RETURNING id, parent_slug_id AS "parentSlugId", title, description, image_url AS "imgUrl";
         `;
         const { rows } = await client.query(updateTypeQuery, [
-            validParentSlug,
+            parentRecord.id,
             sanitizedTitle,
             sanitizedDesc,
             finalImgUrl,
@@ -383,8 +624,14 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 
         await client.query('COMMIT');
 
-        await logActivity(req, `Update Type: "${oldTitle}" menjadi "${rows[0].title}" (ID: ${rows[0].id})`);
-        res.json(rows[0]);
+        const responseData = {
+            ...rows[0],
+            parentSlug: parentRecord.slug,
+            parentTitle: parentRecord.title
+        };
+
+        await logActivity(req, `Update Type: "${oldTitle}" menjadi "${responseData.title}" (ID: ${responseData.id})`);
+        res.json(responseData);
     } catch (error) {
         await client.query('ROLLBACK');
         next(error);

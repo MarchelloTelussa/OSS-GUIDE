@@ -3,11 +3,7 @@ import { initAuth, hasRole, getCurrentUser } from './auth-state.js';
 
 // State Management
 const state = {
-    typeParents: [
-        { slug: 'web', title: 'Web' },
-        { slug: 'mobile', title: 'Mobile' },
-        { slug: 'email', title: 'Email' }
-    ],
+    typeParents: [],
     types: [],
     selectedTypeId: null,
     groups: [],
@@ -25,60 +21,72 @@ let currentLogPage = 1;
 let currentMethodFilter = 'ALL';
 const LOGS_PER_PAGE = 10;
 
-
 /**
  * Initialize Dashboard & Authenticate User
  */
 async function init() {
-    await initAuth(); // Inject DOM admin terlebih dahulu
+    await initAuth();
 
     state.currentUser = getCurrentUser();
 
     if (hasRole('ITAdmin')) {
         injectAdminDOM();
     }
-    cacheDOMElements();     // Cache elemen DOM setelah elemen admin ter-inject
-    setupEventListeners(); // Pasang event listeners pada seluruh elemen
+    cacheDOMElements();
+    setupEventListeners();
     await fetchAndRenderTypes();
 }
-
 
 /**
  * Injeksi elemen HTML khusus Admin ke dalam DOM
  */
 function injectAdminDOM() {
-    // 1. Inject Tombol Manage Types & Lonceng Log Aktivitas (Satu Kontainer)
     const typeManageContainer = document.getElementById('typeManageContainer');
     if (typeManageContainer) {
         typeManageContainer.innerHTML = `
             <button id="btnActivityLog" title="Log Aktivitas Admin"><i class="fa-solid fa-bell fa-lg"></i></button>
-            <button id="btnManage" title="Manage Types"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
+            <button id="btnManage" title="Manage Category & Type"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
         `;
     }
 
-    // 2. Inject Modal Modals & Backdrop
     const holder = document.getElementById('adminModalHolder');
     if (holder) {
         holder.innerHTML = `
             <div id="backdrop" class="backdrop"></div>
 
+            <!-- Modal Manage Category & Type (Segmented Pill Tab) -->
             <div id="manageTypeModal" class="typeModal">
                 <div class="typeModalHeader">
-                    <h2>Manage Type</h2>
+                    <h2>Manage Category & Type</h2>
                     <button id="closeManageModal" class="closeModalBtn">&times;</button>
                 </div>
-                <div class="addTypeForm">
-                    <select id="newTypeParentSelect" class="selectParent">
-                        <option value="web">Web</option>
-                        <option value="mobile">Mobile</option>
-                        <option value="email">Email</option>
-                    </select>
-                    <input type="text" id="newTypeTitleInput" placeholder="Masukkan judul type baru...">
-                    <button id="btnSubmitAddType" title="Tambah Type"><i class="fa-solid fa-plus"></i></button>
+
+                <div class="modalPillTabs">
+                    <button type="button" class="pillTabBtn active" data-tab="types">Type</button>
+                    <button type="button" class="pillTabBtn" data-tab="parents">Parent Category</button>
                 </div>
-                <div id="typeListManage" class="typeListManage"></div>
+
+                <!-- TAB 1: MANAGE TYPE -->
+                <div id="tabContentTypes" class="modalTabPane active">
+                    <div class="addTypeForm">
+                        <select id="newTypeParentSelect" class="selectParent"></select>
+                        <input type="text" id="newTypeTitleInput" placeholder="Masukkan judul type baru...">
+                        <button id="btnSubmitAddType" title="Tambah Type"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="typeListManage" class="typeListManage"></div>
+                </div>
+
+                <!-- TAB 2: MANAGE PARENT SLUG -->
+                <div id="tabContentParents" class="modalTabPane" style="display: none;">
+                    <div class="addTypeForm">
+                        <input type="text" id="newParentTitleInput" placeholder="Masukkan kategori induk baru (misal: Desktop)...">
+                        <button id="btnSubmitAddParent" title="Tambah Parent Category"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <div id="parentListManage" class="typeListManage"></div>
+                </div>
             </div>
 
+            <!-- Modal Edit Type -->
             <div id="editTypeModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Edit Type Detail</h2>
@@ -96,11 +104,7 @@ function injectAdminDOM() {
                     </div>
                     <div>
                         <label>Parent Application</label>
-                        <select id="editTypeParentSelect" class="selectParentInput">
-                            <option value="web">Web</option>
-                            <option value="mobile">Mobile</option>
-                            <option value="email">Email</option>
-                        </select>
+                        <select id="editTypeParentSelect" class="selectParentInput"></select>
                     </div>
                     <div>
                         <label>Upload Gambar / Screenshot Flow</label>
@@ -111,6 +115,31 @@ function injectAdminDOM() {
                 </form>
             </div>
 
+            <!-- Modal Edit Parent Category -->
+            <div id="editParentModal" class="typeModal">
+                <div class="typeModalHeader">
+                    <h2>Edit Parent Category</h2>
+                    <button id="closeEditParentModal" class="closeModalBtn">&times;</button>
+                </div>
+                <form id="editParentForm" class="editTypeForm">
+                    <input type="hidden" id="editParentId">
+                    <div>
+                        <label>Title (Tampilan Menu)</label>
+                        <input type="text" id="editParentTitle" required placeholder="Contoh: Web Application">
+                    </div>
+                    <div>
+                        <label>Slug (URL Identifier)</label>
+                        <input type="text" id="editParentSlug" required placeholder="Contoh: web">
+                    </div>
+                    <div>
+                        <label>Description (Opsional)</label>
+                        <textarea id="editParentDesc" rows="2" placeholder="Masukkan deskripsi kategori..."></textarea>
+                    </div>
+                    <button type="submit" class="btnSave">Simpan Perubahan</button>
+                </form>
+            </div>
+
+            <!-- Modal Manage Guide Group -->
             <div id="manageGroupModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Manage Guide Group</h2>
@@ -123,6 +152,7 @@ function injectAdminDOM() {
                 <div id="groupListManage" class="typeListManage"></div>
             </div>
 
+            <!-- Modal Edit Guide Group -->
             <div id="editGroupModal" class="typeModal">
                 <div class="typeModalHeader">
                     <h2>Edit Guide Group</h2>
@@ -164,17 +194,30 @@ function cacheDOMElements() {
         searchBtn: document.getElementById('searchBtn'),
         fullscreenBtn: document.getElementById('fullscreen'),
 
-        // Admin Elements (Akan ada jika di-inject)
+        // Admin Elements
         btnManage: document.getElementById('btnManage'),
         btnActivityLog: document.getElementById('btnActivityLog'),
         backdrop: document.getElementById('backdrop'),
+
+        // Manage Modal & Tabs
         manageTypeModal: document.getElementById('manageTypeModal'),
         closeManageModal: document.getElementById('closeManageModal'),
+        pillTabBtns: document.querySelectorAll('.pillTabBtn'),
+        tabContentTypes: document.getElementById('tabContentTypes'),
+        tabContentParents: document.getElementById('tabContentParents'),
+
+        // Type Controls
+        newTypeParentSelect: document.getElementById('newTypeParentSelect'),
         newTypeTitleInput: document.getElementById('newTypeTitleInput'),
         btnSubmitAddType: document.getElementById('btnSubmitAddType'),
         typeListManage: document.getElementById('typeListManage'),
-        newTypeParentSelect: document.getElementById('newTypeParentSelect'),
 
+        // Parent Slug Controls
+        newParentTitleInput: document.getElementById('newParentTitleInput'),
+        btnSubmitAddParent: document.getElementById('btnSubmitAddParent'),
+        parentListManage: document.getElementById('parentListManage'),
+
+        // Edit Type Modal
         editTypeModal: document.getElementById('editTypeModal'),
         closeEditModal: document.getElementById('closeEditModal'),
         editTypeForm: document.getElementById('editTypeForm'),
@@ -185,6 +228,16 @@ function cacheDOMElements() {
         currentImgUrlPath: document.getElementById('currentImgUrlPath'),
         editTypeParentSelect: document.getElementById('editTypeParentSelect'),
 
+        // Edit Parent Modal
+        editParentModal: document.getElementById('editParentModal'),
+        closeEditParentModal: document.getElementById('closeEditParentModal'),
+        editParentForm: document.getElementById('editParentForm'),
+        editParentId: document.getElementById('editParentId'),
+        editParentTitle: document.getElementById('editParentTitle'),
+        editParentSlug: document.getElementById('editParentSlug'),
+        editParentDesc: document.getElementById('editParentDesc'),
+
+        // Group Modals
         manageGroupModal: document.getElementById('manageGroupModal'),
         closeManageGroupModal: document.getElementById('closeManageGroupModal'),
         newGroupTitleInput: document.getElementById('newGroupTitleInput'),
@@ -219,28 +272,43 @@ function setupEventListeners() {
         });
     }
 
-    // Event listener admin hanya diaktifkan jika elemen ter-inject
+    // Admin Listeners
     if (elements.btnManage) elements.btnManage.addEventListener('click', openManageModal);
-    if (elements.btnActivityLog) elements.btnActivityLog.addEventListener('click', renderActivityLogView);
+    if (elements.btnActivityLog) elements.btnActivityLog.addEventListener('click', () => renderActivityLogView(1));
     if (elements.closeManageModal) elements.closeManageModal.addEventListener('click', closeAllModals);
     if (elements.closeEditModal) elements.closeEditModal.addEventListener('click', closeAllModals);
+    if (elements.closeEditParentModal) elements.closeEditParentModal.addEventListener('click', closeAllModals);
     if (elements.backdrop) elements.backdrop.addEventListener('click', closeAllModals);
 
+    // Pill Tab Switcher
+    if (elements.pillTabBtns) {
+        elements.pillTabBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchManageTab(btn.dataset.tab));
+        });
+    }
+
+    // Type CRUD Listeners
     if (elements.btnSubmitAddType) elements.btnSubmitAddType.addEventListener('click', handleCreateType);
     if (elements.newTypeTitleInput) {
         elements.newTypeTitleInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleCreateType();
         });
     }
-
     if (elements.newTypeParentSelect) {
-        elements.newTypeParentSelect.addEventListener('change', () => {
-            renderManageTypeList();
-        });
+        elements.newTypeParentSelect.addEventListener('change', renderManageTypeList);
     }
-
     if (elements.editTypeForm) elements.editTypeForm.addEventListener('submit', handleUpdateType);
 
+    // Parent Slug CRUD Listeners
+    if (elements.btnSubmitAddParent) elements.btnSubmitAddParent.addEventListener('click', handleCreateParent);
+    if (elements.newParentTitleInput) {
+        elements.newParentTitleInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleCreateParent();
+        });
+    }
+    if (elements.editParentForm) elements.editParentForm.addEventListener('submit', handleUpdateParent);
+
+    // Group CRUD Listeners
     if (elements.closeManageGroupModal) elements.closeManageGroupModal.addEventListener('click', closeAllModals);
     if (elements.closeEditGroupModal) elements.closeEditGroupModal.addEventListener('click', closeAllModals);
     if (elements.btnSubmitAddGroup) elements.btnSubmitAddGroup.addEventListener('click', handleCreateGroup);
@@ -253,11 +321,29 @@ function setupEventListeners() {
 }
 
 /**
+ * Sinkronisasi opsi dropdown Parent Category pada form Add & Edit Type
+ */
+function populateParentDropdowns() {
+    const selects = [elements.newTypeParentSelect, elements.editTypeParentSelect];
+
+    selects.forEach(selectEl => {
+        if (!selectEl) return;
+        const currentVal = selectEl.value;
+        selectEl.innerHTML = state.typeParents
+            .map(p => `<option value="${p.id}" data-slug="${escapeHTML(p.slug)}">${escapeHTML(p.title)}</option>`)
+            .join('');
+
+        if (currentVal && state.typeParents.some(p => String(p.id) === String(currentVal))) {
+            selectEl.value = currentVal;
+        }
+    });
+}
+
+/**
  * Render Tampilan Default (Welcome Screen QuantumGuide)
  */
 function renderDefaultView() {
     state.selectedTypeId = null;
-    
     renderTypeTabs();
 
     if (elements.typeIdentityContainer) {
@@ -286,7 +372,6 @@ function renderDefaultView() {
 /**
  * Render Tampilan Log Aktivitas saat Lonceng diklik
  */
-
 async function renderActivityLogView(page = 1) {
     currentLogPage = page;
     currentMethodFilter = 'ALL';
@@ -324,19 +409,17 @@ async function renderActivityLogView(page = 1) {
 
     document.getElementById('btnCloseLogView')?.addEventListener('click', renderDefaultView);
 
-    // Filter listener: Reset ke halaman 1 saat filter berubah
     document.getElementById('logMethodFilter')?.addEventListener('change', (e) => {
         currentMethodFilter = e.target.value;
-        currentLogPage = 1; // Reset ke halaman 1
+        currentLogPage = 1;
         fetchAndRenderLogs(currentLogPage, currentMethodFilter);
     });
 
     await fetchAndRenderLogs(currentLogPage, currentMethodFilter);
 }
 
-// Helper untuk menghasilkan array nomor halaman dinamis dengan ellipsis (...)
 function generatePaginationRange(currentPage, totalPages) {
-    const delta = 2; // Jumlah halaman di kiri & kanan halaman aktif
+    const delta = 2;
     const range = [];
     const rangeWithDots = [];
     let l;
@@ -347,7 +430,7 @@ function generatePaginationRange(currentPage, totalPages) {
         }
     }
 
-    for (let i of range) {
+    for (const i of range) {
         if (l) {
             if (i - l === 2) {
                 rangeWithDots.push(l + 1);
@@ -384,7 +467,6 @@ async function fetchAndRenderLogs(page, method = 'ALL') {
             return;
         }
 
-        // 1. Render Tabel
         logContent.innerHTML = `
             <table class="logTable">
                 <thead>
@@ -410,10 +492,9 @@ async function fetchAndRenderLogs(page, method = 'ALL') {
             </table>
         `;
 
-        // 2. Render Paginasi Dinamis
         if (paginationContent) {
             const pageRange = generatePaginationRange(currentPage, totalPages);
-            
+
             const pageButtons = pageRange.map(item => {
                 if (item === '...') {
                     return `<span class="logPageEllipsis">...</span>`;
@@ -439,7 +520,6 @@ async function fetchAndRenderLogs(page, method = 'ALL') {
                 </div>
             `;
 
-            // Event listener Navigasi Prev/Next
             document.getElementById('btnPrevLog')?.addEventListener('click', () => {
                 if (currentPage > 1) {
                     currentLogPage = currentPage - 1;
@@ -454,7 +534,6 @@ async function fetchAndRenderLogs(page, method = 'ALL') {
                 }
             });
 
-            // Event listener tombol angka halaman
             document.querySelectorAll('.logPageNumbers .logPageBtn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const targetPage = parseInt(e.currentTarget.getAttribute('data-page'), 10);
@@ -479,10 +558,7 @@ async function fetchAndRenderLogs(page, method = 'ALL') {
 function restoreTypeIdentityDOM() {
     if (!elements.typeIdentityContainer) return;
 
-    // Kembalikan class bawaan
     elements.typeIdentityContainer.className = 'typeIdentity';
-
-    // Restorasi struktur HTML internal untuk type
     elements.typeIdentityContainer.innerHTML = `
         <div class="typeDetail">
             <div id="typeName"></div>
@@ -491,36 +567,44 @@ function restoreTypeIdentityDOM() {
         <div class="typeImage"></div>
     `;
 
-    // Re-cache elemen-elemen anak agar reference di objek `elements` tetap valid
     elements.typeName = document.getElementById('typeName');
     elements.typeDesc = document.getElementById('typeDesc');
     elements.typeImageContainer = document.querySelector('.typeImage');
 }
 
 /**
- * Fetch All Types
+ * Fetch Parent Slugs & Types Secara Paralel
  */
-async function fetchAndRenderTypes() {
+async function fetchAndRenderTypes(keepCurrentView = false) {
     try {
-        const response = await fetch(`${API_BASE}/types`);
-        if (!response.ok) throw new Error('Failed to load types');
-        
-        state.types = await response.json();
-        
-        if (state.types.length === 0) {
+        const [parentsRes, typesRes] = await Promise.all([
+            fetch(`${API_BASE}/parent-slugs`),
+            fetch(`${API_BASE}/types`)
+        ]);
+
+        if (!parentsRes.ok || !typesRes.ok) {
+            throw new Error('Failed to load categories or types');
+        }
+
+        state.typeParents = await parentsRes.json();
+        state.types = await typesRes.json();
+
+        populateParentDropdowns();
+
+        if (state.typeParents.length === 0) {
             elements.typesContainer.innerHTML = `
                 <div class="typeGroup">
-                    <div class="dropdownBtn disabled"><span>No Types Available</span></div>
+                    <div class="dropdownBtn disabled"><span>No Categories Available</span></div>
                 </div>
             `;
             return;
         }
 
         renderTypeTabs();
-        
-        // Panggil tampilan default saat pertama kali load / refresh
-        renderDefaultView();
 
+        if (!keepCurrentView) {
+            renderDefaultView();
+        }
     } catch (error) {
         console.error('Error fetching types:', error);
         elements.typesContainer.innerHTML = `
@@ -538,7 +622,7 @@ function renderTypeTabs() {
         const dropdown = document.createElement('div');
         dropdown.className = 'typeDropdown';
 
-        const parentTypes = state.types.filter(t => t.parentSlug === parent.slug);
+        const parentTypes = state.types.filter(t => Number(t.parentSlugId) === Number(parent.id));
         const isParentActive = parentTypes.some(t => t.id === state.selectedTypeId);
 
         dropdown.innerHTML = `
@@ -547,12 +631,12 @@ function renderTypeTabs() {
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
             <div class="dropdownMenu">
-                ${parentTypes.length > 0 
+                ${parentTypes.length > 0
                     ? parentTypes.map(type => `
                         <div class="dropdownItem ${type.id === state.selectedTypeId ? 'active' : ''}" data-id="${type.id}">
                             ${escapeHTML(type.title)}
                         </div>
-                    `).join('') 
+                    `).join('')
                     : '<div class="dropdownItem disabled">Belum ada type</div>'
                 }
             </div>
@@ -593,7 +677,6 @@ async function selectType(typeId) {
         renderTypeIdentity(typeData);
         renderTypeImage(typeData.imgUrl);
         await fetchAndRenderGuideGroups(typeId);
-
     } catch (error) {
         console.error('Error selecting type:', error);
     }
@@ -648,7 +731,7 @@ async function fetchAndRenderGuideGroups(typeId) {
 function renderGuideGroups(groups) {
     const isAdmin = state.currentUser && state.currentUser.role === 'ITAdmin';
 
-    let contentHTML = `
+    elements.guideGroupContainer.innerHTML = `
         <div class="guideHeader">
             <div class="guideTitleRow">
                 <h1>Guide</h1>
@@ -667,8 +750,6 @@ function renderGuideGroups(groups) {
         <div id="groupListContainer"></div>
     `;
 
-    elements.guideGroupContainer.innerHTML = contentHTML;
-
     const listContainer = document.getElementById('groupListContainer');
 
     function renderList(filteredGroups) {
@@ -682,9 +763,7 @@ function renderGuideGroups(groups) {
         filteredGroups.forEach((group) => {
             const groupCard = document.createElement('div');
             groupCard.className = 'guideGroup';
-            groupCard.innerHTML = `
-                <h1>${escapeHTML(group.title)}</h1>
-            `;
+            groupCard.innerHTML = `<h1>${escapeHTML(group.title)}</h1>`;
 
             groupCard.addEventListener('click', () => handleGuideGroupClick(group));
             listContainer.appendChild(groupCard);
@@ -700,11 +779,28 @@ function renderGuideGroups(groups) {
 }
 
 // =============================================================
-// MODAL CRUD TYPE MANAGEMENT (ADMIN ONLY)
+// MODAL CONTROL & PILL TAB SWITCHER (ADMIN ONLY)
 // =============================================================
 
+function switchManageTab(tabName) {
+    elements.pillTabBtns?.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+
+    if (tabName === 'parents') {
+        if (elements.tabContentTypes) elements.tabContentTypes.style.display = 'none';
+        if (elements.tabContentParents) elements.tabContentParents.style.display = 'block';
+        renderManageParentList();
+    } else {
+        if (elements.tabContentParents) elements.tabContentParents.style.display = 'none';
+        if (elements.tabContentTypes) elements.tabContentTypes.style.display = 'block';
+        renderManageTypeList();
+    }
+}
+
 function openManageModal() {
-    renderManageTypeList();
+    populateParentDropdowns();
+    switchManageTab('types');
     elements.backdrop?.classList.add('active');
     elements.manageTypeModal?.classList.add('active');
 }
@@ -713,19 +809,188 @@ function closeAllModals() {
     elements.backdrop?.classList.remove('active');
     elements.manageTypeModal?.classList.remove('active');
     elements.editTypeModal?.classList.remove('active');
+    elements.editParentModal?.classList.remove('active');
     elements.manageGroupModal?.classList.remove('active');
     elements.editGroupModal?.classList.remove('active');
 }
+
+// =============================================================
+// MODAL CRUD PARENT CATEGORY (ADMIN ONLY)
+// =============================================================
+
+function renderManageParentList() {
+    if (!elements.parentListManage) return;
+    elements.parentListManage.innerHTML = '';
+
+    if (state.typeParents.length === 0) {
+        elements.parentListManage.innerHTML = '<p style="text-align:center;">Belum ada Parent Category.</p>';
+        return;
+    }
+
+    state.typeParents.forEach((parent) => {
+        const item = document.createElement('div');
+        item.className = 'manageTypeItem';
+        item.innerHTML = `
+            <div class="manageTypeTitle">
+                ${escapeHTML(parent.title)} 
+                <small style="opacity: 0.75; font-weight: 400;">(${parent.typeCount || 0} type)</small>
+            </div>
+            <div class="manageTypeActions">
+                <button class="btnEdit" title="Edit Kategori Induk"><i class="fa-regular fa-pen-to-square"></i></button>
+                <button class="btnDelete" title="Hapus Kategori Induk"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+        `;
+
+        item.querySelector('.btnEdit').addEventListener('click', () => openEditParentModal(parent));
+        item.querySelector('.btnDelete').addEventListener('click', () => handleDeleteParent(parent));
+
+        elements.parentListManage.appendChild(item);
+    });
+}
+
+async function handleCreateParent() {
+    const title = elements.newParentTitleInput.value.trim();
+
+    if (!title) {
+        await CustomDialog.showAlert({
+            title: 'Input Kosong',
+            message: 'Nama kategori induk tidak boleh kosong!',
+            type: 'warning'
+        });
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/parent-slugs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Gagal menambah Parent Category');
+        }
+
+        elements.newParentTitleInput.value = '';
+        await fetchAndRenderTypes(Boolean(state.selectedTypeId));
+        renderManageParentList();
+        showToast(`Berhasil menambahkan kategori "${data.title}"`);
+    } catch (error) {
+        console.error('Error creating parent slug:', error);
+        await CustomDialog.showAlert({
+            title: 'Gagal Tambah Kategori',
+            message: error.message || 'Gagal membuat kategori induk.',
+            type: 'danger'
+        });
+    }
+}
+
+function openEditParentModal(parent) {
+    elements.editParentId.value = parent.id;
+    elements.editParentTitle.value = parent.title;
+    elements.editParentSlug.value = parent.slug;
+
+    elements.manageTypeModal.classList.remove('active');
+    elements.editParentModal.classList.add('active');
+}
+
+async function handleUpdateParent(e) {
+    e.preventDefault();
+
+    const id = elements.editParentId.value;
+    const title = elements.editParentTitle.value.trim();
+    const slug = elements.editParentSlug.value.trim();
+    const description = elements.editParentDesc.value.trim();
+
+    if (!title || !slug) {
+        await CustomDialog.showAlert({
+            title: 'Input Tidak Lengkap',
+            message: 'Title dan Slug wajib diisi!',
+            type: 'warning'
+        });
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/parent-slugs/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, slug })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Gagal memperbarui Parent Category');
+        }
+
+        closeAllModals();
+        await fetchAndRenderTypes(Boolean(state.selectedTypeId));
+        showToast(`Berhasil memperbarui kategori "${data.title}"`);
+    } catch (error) {
+        console.error('Error updating parent slug:', error);
+        await CustomDialog.showAlert({
+            title: 'Gagal Update Kategori',
+            message: error.message || 'Gagal mengupdate kategori induk.',
+            type: 'danger'
+        });
+    }
+}
+
+async function handleDeleteParent(parent) {
+    const typeCount = parent.typeCount || 0;
+    const warningMsg = typeCount > 0
+        ? `PERINGATAN: Kategori "${parent.title}" masih memiliki ${typeCount} Type di dalamnya. Menghapus kategori ini akan menghapus SELURUH Type, Guide Group, Guide, dan video di bawahnya secara permanen. Lanjutkan?`
+        : `Apakah Anda yakin ingin menghapus kategori "${parent.title}"?`;
+
+    const isConfirmed = await CustomDialog.showConfirm({
+        title: 'Hapus Parent Category',
+        message: warningMsg,
+        confirmText: 'Ya, Hapus',
+        cancelText: 'Batal'
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/parent-slugs/${parent.id}`, { method: 'DELETE' });
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Gagal menghapus Parent Category');
+        }
+
+        const wasSelectedTypeDeleted = state.types.some(
+            t => Number(t.parentSlugId) === Number(parent.id) && t.id === state.selectedTypeId
+        );
+
+        await fetchAndRenderTypes(!wasSelectedTypeDeleted);
+        renderManageParentList();
+        showToast(`Berhasil menghapus kategori "${parent.title}"`);
+    } catch (error) {
+        console.error('Error deleting parent slug:', error);
+        await CustomDialog.showAlert({
+            title: 'Gagal Hapus Kategori',
+            message: error.message || 'Gagal menghapus kategori induk dari server.',
+            type: 'danger'
+        });
+    }
+}
+
+// =============================================================
+// MODAL CRUD TYPE MANAGEMENT (ADMIN ONLY)
+// =============================================================
 
 function renderManageTypeList() {
     if (!elements.typeListManage) return;
     elements.typeListManage.innerHTML = '';
 
-    const selectedParentSlug = elements.newTypeParentSelect ? elements.newTypeParentSelect.value : 'web';
-    const filteredTypes = state.types.filter(type => type.parentSlug === selectedParentSlug);
+    const selectedParentId = elements.newTypeParentSelect ? Number(elements.newTypeParentSelect.value) : null;
+    const selectedParentObj = state.typeParents.find(p => Number(p.id) === selectedParentId);
+    const filteredTypes = state.types.filter(type => Number(type.parentSlugId) === selectedParentId);
 
     if (filteredTypes.length === 0) {
-        elements.typeListManage.innerHTML = `<p style="text-align:center;">Belum ada type untuk parent "${escapeHTML(selectedParentSlug)}".</p>`;
+        const parentLabel = selectedParentObj ? selectedParentObj.title : 'kategori ini';
+        elements.typeListManage.innerHTML = `<p style="text-align:center;">Belum ada type untuk "${escapeHTML(parentLabel)}".</p>`;
         return;
     }
 
@@ -748,8 +1013,17 @@ function renderManageTypeList() {
 }
 
 async function handleCreateType() {
-    const parentSlug = elements.newTypeParentSelect.value;
+    const parentSlugId = elements.newTypeParentSelect ? Number(elements.newTypeParentSelect.value) : null;
     const title = elements.newTypeTitleInput.value.trim();
+
+    if (!parentSlugId) {
+        await CustomDialog.showAlert({
+            title: 'Kategori Belum Dipilih',
+            message: 'Buat atau pilih Parent Category terlebih dahulu!',
+            type: 'warning'
+        });
+        return;
+    }
 
     if (!title) {
         await CustomDialog.showAlert({
@@ -780,10 +1054,10 @@ async function handleCreateType() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                parentSlug: parentSlug,
-                title: title,
-                description: "",
-                imgUrl: ""
+                parentSlugId,
+                title,
+                description: '',
+                imgUrl: ''
             })
         });
 
@@ -793,10 +1067,9 @@ async function handleCreateType() {
         }
 
         elements.newTypeTitleInput.value = '';
-        await fetchAndRenderTypes();
+        await fetchAndRenderTypes(Boolean(state.selectedTypeId));
         renderManageTypeList();
         showToast(`Berhasil menambahkan type "${title}"`);
-
     } catch (error) {
         console.error('Error creating type:', error);
         await CustomDialog.showAlert({
@@ -808,19 +1081,21 @@ async function handleCreateType() {
 }
 
 function openEditTypeModal(type) {
+    populateParentDropdowns();
+
     elements.editTypeId.value = type.id;
     elements.editTypeTitle.value = type.title;
     elements.editTypeTitle.dataset.originalTitle = type.title;
     elements.editTypeDesc.value = type.description || '';
-    
-    if (elements.editTypeParentSelect) {
-        elements.editTypeParentSelect.value = type.parentSlug || 'web';
+
+    if (elements.editTypeParentSelect && type.parentSlugId) {
+        elements.editTypeParentSelect.value = String(type.parentSlugId);
     }
 
     currentExistingImgUrl = type.imgUrl || '';
     if (elements.currentImgUrlPath) {
-        elements.currentImgUrlPath.innerText = currentExistingImgUrl 
-            ? `Path saat ini: ${currentExistingImgUrl}` 
+        elements.currentImgUrlPath.innerText = currentExistingImgUrl
+            ? `Path saat ini: ${currentExistingImgUrl}`
             : 'Belum ada gambar yang diunggah';
     }
 
@@ -837,8 +1112,8 @@ async function handleUpdateType(e) {
     const title = elements.editTypeTitle.value.trim();
     const description = elements.editTypeDesc.value.trim();
     const imageFile = elements.editTypeImageInput?.files ? elements.editTypeImageInput.files[0] : null;
-    const parentSlug = elements.editTypeParentSelect ? elements.editTypeParentSelect.value : 'web';
-    
+    const parentSlugId = elements.editTypeParentSelect ? Number(elements.editTypeParentSelect.value) : null;
+
     if (!title) {
         await CustomDialog.showAlert({
             title: 'Input Kosong',
@@ -889,11 +1164,11 @@ async function handleUpdateType(e) {
         const response = await fetch(`${API_BASE}/types/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                parentSlug,
-                title, 
-                description, 
-                imgUrl: finalImgUrl 
+            body: JSON.stringify({
+                parentSlugId,
+                title,
+                description,
+                imgUrl: finalImgUrl
             })
         });
 
@@ -903,10 +1178,9 @@ async function handleUpdateType(e) {
         }
 
         closeAllModals();
-        await fetchAndRenderTypes();
-        if (state.selectedTypeId == id) selectType(id);
+        await fetchAndRenderTypes(Boolean(state.selectedTypeId));
+        if (state.selectedTypeId == id) selectType(Number(id));
         showToast(`Berhasil memperbarui type "${title}"`);
-
     } catch (error) {
         console.error('Error updating type:', error);
         await CustomDialog.showAlert({
@@ -931,16 +1205,11 @@ async function handleDeleteType(id, title) {
         const response = await fetch(`${API_BASE}/types/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Gagal menghapus Type');
 
-        await fetchAndRenderTypes();
+        const isDeletingActiveType = Number(state.selectedTypeId) === Number(id);
+        await fetchAndRenderTypes(!isDeletingActiveType);
         renderManageTypeList();
 
-        if (state.selectedTypeId == id) {
-            state.selectedTypeId = state.types.length > 0 ? state.types[0].id : null;
-            if (state.selectedTypeId) selectType(state.selectedTypeId);
-        }
-
         showToast(`Berhasil menghapus type "${title}"`);
-
     } catch (error) {
         console.error('Error deleting type:', error);
         await CustomDialog.showAlert({
@@ -1016,8 +1285,8 @@ async function handleCreateGroup() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 typeId: state.selectedTypeId,
-                title: title,
-                description: "",
+                title,
+                description: '',
                 groupOrder: state.groups.length + 1
             })
         });
@@ -1031,7 +1300,6 @@ async function handleCreateGroup() {
         await fetchAndRenderGuideGroups(state.selectedTypeId);
         renderManageGroupList();
         showToast(`Berhasil menambahkan group "${title}"`);
-
     } catch (error) {
         console.error('Error creating group:', error);
         await CustomDialog.showAlert({
@@ -1063,7 +1331,6 @@ async function handleUpdateGroup(e) {
     const title = elements.editGroupTitle.value.trim();
     const description = elements.editGroupDesc.value.trim();
     const groupOrder = parseInt(elements.editGroupOrder.value, 10) || 0;
-
     const targetTypeId = elements.editGroupForm?.dataset?.typeId || state.selectedTypeId;
 
     if (!targetTypeId) {
@@ -1091,7 +1358,7 @@ async function handleUpdateGroup(e) {
         let responseData;
         try {
             responseData = JSON.parse(responseText);
-        } catch (parseErr) {
+        } catch {
             throw new Error(`Server Error (${response.status}): Respons bukan format JSON.`);
         }
 
@@ -1102,7 +1369,6 @@ async function handleUpdateGroup(e) {
         closeAllModals();
         await fetchAndRenderGuideGroups(targetTypeId);
         showToast(`Berhasil memperbarui group "${title}"`);
-
     } catch (error) {
         console.error('Error updating group:', error);
         await CustomDialog.showAlert({
@@ -1130,7 +1396,6 @@ async function handleDeleteGroup(id, title) {
         await fetchAndRenderGuideGroups(state.selectedTypeId);
         renderManageGroupList();
         showToast(`Berhasil menghapus group "${title}"`);
-
     } catch (error) {
         console.error('Error deleting group:', error);
         await CustomDialog.showAlert({
@@ -1141,7 +1406,10 @@ async function handleDeleteGroup(id, title) {
     }
 }
 
-// Helpers
+// =============================================================
+// HELPERS & SEARCH
+// =============================================================
+
 function handleSearch() {
     const query = elements.searchBar.value.trim().toLowerCase();
     state.searchQuery = query;
@@ -1152,10 +1420,10 @@ function handleSearch() {
     }
 
     const filteredGroups = state.groups.filter(group => {
-        const matchGroup = group.title.toLowerCase().includes(query) || 
-                           (group.description && group.description.toLowerCase().includes(query));
+        const matchGroup = group.title.toLowerCase().includes(query) ||
+            (group.description && group.description.toLowerCase().includes(query));
 
-        const matchGuide = group.guides && group.guides.some(guide => 
+        const matchGuide = group.guides && group.guides.some(guide =>
             guide.title.toLowerCase().includes(query) ||
             (guide.functionDesc && guide.functionDesc.toLowerCase().includes(query))
         );
@@ -1164,17 +1432,6 @@ function handleSearch() {
     });
 
     renderGuideGroups(filteredGroups);
-}
-
-function updateActiveSuggestion(items, selectedIndex) {
-    items.forEach((item, index) => {
-        if (index === selectedIndex) {
-            item.classList.add('active');
-            item.scrollIntoView({ block: 'nearest' });
-        } else {
-            item.classList.remove('active');
-        }
-    });
 }
 
 function showToast(message) {
@@ -1221,8 +1478,8 @@ function setupSearchSuggestions(groups) {
         const matches = [];
 
         groups.forEach(group => {
-            if (group.title.toLowerCase().includes(query) || 
-               (group.description && group.description.toLowerCase().includes(query))) {
+            if (group.title.toLowerCase().includes(query) ||
+                (group.description && group.description.toLowerCase().includes(query))) {
                 matches.push({
                     type: 'group',
                     id: group.id,
@@ -1279,13 +1536,8 @@ function setupSearchSuggestions(groups) {
                 searchBar.value = '';
                 suggestionsBox.style.display = 'none';
 
-                // --- LOGIKA NAVIGASI ---
                 if (targetType === 'guide') {
-                    // Opsi A: Jika berpindah halaman dengan query parameter
                     window.location.href = `guide.html?groupId=${targetGroupId}&guideId=${targetId}`;
-                    
-                    // Opsi B: Jika SPA (Single Page Application), panggil fungsi render langsung:
-                    // renderSpecificGuide(targetGroupId, targetId);
                 } else {
                     window.location.href = `guide.html?groupId=${targetGroupId}`;
                 }
@@ -1295,12 +1547,8 @@ function setupSearchSuggestions(groups) {
 
     function highlightMatch(text, query) {
         if (!query) return escapeHTML(text);
-        
-        // Escape regex special characters
         const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`(${escapedQuery})`, 'gi');
-        
-        // Split berdasarkan match agar bisa meng-escape teks non-match dan menyisipkan <strong>
         const parts = text.split(regex);
         return parts.map(part => {
             if (part.toLowerCase() === query.toLowerCase()) {
@@ -1333,13 +1581,11 @@ function setupSearchSuggestions(groups) {
             e.preventDefault();
             selectedIndex = (selectedIndex + 1) % items.length;
             updateActiveSuggestion(items, selectedIndex);
-
         } else if (e.key === 'ArrowUp') {
             if (!isBoxVisible) return;
             e.preventDefault();
             selectedIndex = (selectedIndex - 1 + items.length) % items.length;
             updateActiveSuggestion(items, selectedIndex);
-
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (isBoxVisible && selectedIndex >= 0 && items[selectedIndex]) {
@@ -1350,7 +1596,6 @@ function setupSearchSuggestions(groups) {
                 selectedIndex = -1;
                 if (typeof handleSearch === 'function') handleSearch();
             }
-
         } else if (e.key === 'Escape') {
             suggestionsBox.style.display = 'none';
             selectedIndex = -1;
@@ -1380,14 +1625,14 @@ function toggleFullscreen() {
         document.documentElement.requestFullscreen().catch(err => {
             console.error(`Error attempting to enable fullscreen: ${err.message}`);
         });
-    } else {
-        if (document.exitFullscreen) document.exitFullscreen();
+    } else if (document.exitFullscreen) {
+        document.exitFullscreen();
     }
 }
 
 function escapeHTML(str) {
     if (!str) return '';
-    return String(str).replace(/[&<>'"]/g, 
+    return String(str).replace(/[&<>'"]/g,
         tag => ({
             '&': '&amp;',
             '<': '&lt;',

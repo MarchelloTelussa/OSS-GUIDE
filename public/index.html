@@ -167,6 +167,10 @@
         .editTypeForm input, .editTypeForm textarea { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--outline); border-radius: 6px; font-size: 1rem; }
         .editTypeForm button.btnSave { background-color: var(--main); color: white; border: none; padding: 0.8rem; font-size: 1.1rem; font-weight: bold; border-radius: 6px; cursor: pointer; }
 
+        .modalPillTabs { display: flex; gap: 8px; background: #eef2f8; padding: 5px; border-radius: 10px; margin-bottom: 16px; }
+        .pillTabBtn { flex: 1; padding: 8px 14px; border: none; border-radius: 7px; background: transparent; color: var(--primary, #000b6b); font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .pillTabBtn.active { background: var(--primary, #000b6b); color: #ffffff; box-shadow: 0 2px 6px rgba(0, 11, 107, 0.2); }
+
         .custom-alert-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -45%) scale(0.95); background-color: var(--card-bg, #ffffff); color: var(--text, #333333); padding: 28px 24px 24px 24px; border-radius: 12px; box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22); z-index: 10000; width: 90%; max-width: 380px; opacity: 0; pointer-events: none; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); text-align: center; border: 1px solid rgba(0, 0, 0, 0.08); }
         .custom-alert-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
         .custom-alert-icon { font-size: 44px; margin-bottom: 14px; display: inline-block; }

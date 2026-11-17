@@ -13,43 +13,87 @@ router.post('/login', botDetector, loginRateLimiter, async (req, res, next) => {
         return res.status(400).json({ error: 'Username dan password wajib diisi' });
     }
 
+    const cleanUsername = username.trim();
+
     try {
-        const { rows } = await db.query(
-            'SELECT id, username, password, role FROM users WHERE username = $1',
-            [username.trim()]
-        );
-        const user = rows[0];
+        // 1. Hit API Login Perusahaan
+        // Sesuaikan key payload (misal: username/email/nik) dengan Swagger perusahaan
+        const companyRes = await fetch(process.env.COMPANY_AUTH_API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                username: cleanUsername,
+                password: password
+            }),
+            signal: AbortSignal.timeout(8000) // Batas waktu 8 detik
+        });
 
-        const valid = await verifyPassword(password, user ? user.password : DUMMY_HASH);
+        const companyData = await companyRes.json().catch(() => ({}));
 
-        if (!user || !valid) {
+        // 2. Cek apakah login ditolak oleh server perusahaan
+        // (Jika API perusahaan selalu return HTTP 200 dengan flag success: false, tambahkan: || companyData.success === false)
+        if (!companyRes.ok) {
             if (req.rateLimit) req.rateLimit.increment();
-            return res.status(401).json({ error: 'Username atau password salah' });
+            return res.status(401).json({ 
+                error: companyData.message || 'Username atau password salah' 
+            });
         }
 
+        // Reset rate limiter jika berhasil login
         if (req.rateLimit) req.rateLimit.reset();
 
-        // 1. Increment token_version di database saat user login baru
-        const updateResult = await db.query(
-            'UPDATE users SET token_version = token_version + 1 WHERE id = $1 RETURNING token_version',
-            [user.id]
-        );
-        const newTokenVersion = updateResult.rows[0].token_version;
+        // 3. Ekstrak & Mapping Role dari Response JSON Perusahaan
+        // Sesuaikan path objek dengan struktur response Swagger (misal: companyData.roleName atau companyData.data?.roleName)
+        const rawRole = (
+            companyData.roleName || 
+            companyData.data?.roleName || 
+            companyData.user?.roleName || 
+            ''
+        ).toString().trim().toLowerCase();
 
-        // 2. Buat JWT dengan menyertakan tokenVersion terbaru
+        // Hanya "super admin" yang menjadi "ITAdmin", sisanya (termasuk "IT" biasa) otomatis menjadi "user"
+        const mappedRole = rawRole === 'super admin' ? 'ITAdmin' : 'user';
+
+        // 4. JIT Provisioning (UPSERT ke tabel users lokal & increment token_version)
+        const upsertQuery = `
+            INSERT INTO users (username, password, role, token_version)
+            VALUES ($1, NULL, $2, 1)
+            ON CONFLICT (username) 
+            DO UPDATE SET 
+                role = EXCLUDED.role,
+                token_version = users.token_version + 1
+            RETURNING id, username, role, token_version;
+        `;
+
+        const { rows } = await db.query(upsertQuery, [cleanUsername, mappedRole]);
+        const user = rows[0];
+
+        // 5. Generate JWT lokal dengan menyertakan tokenVersion terbaru
         const token = generateToken({
             id: user.id,
             username: user.username,
             role: user.role,
-            tokenVersion: newTokenVersion
+            tokenVersion: user.token_version
         });
 
-        // FIX: Tambahkan (req) agar membaca header X-Forwarded-Proto dari Nginx
+        // 6. Set HTTP-Only Cookie (membaca header X-Forwarded-Proto dari Nginx)
         res.cookie(COOKIE_NAME, token, cookieOptions(req));
-        
-        return res.json({ username: user.username, role: user.role });
+
+        return res.json({ 
+            username: user.username, 
+            role: user.role 
+        });
 
     } catch (error) {
+        if (error.name === 'TimeoutError' || error.code === 'ECONNREFUSED') {
+            console.error('[Auth Error] Gagal terhubung ke API Perusahaan:', error.message);
+            return res.status(503).json({ 
+                error: 'Server autentikasi perusahaan sedang tidak dapat dijangkau.' 
+            });
+        }
         next(error);
     }
 });

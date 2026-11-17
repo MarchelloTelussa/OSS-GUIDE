@@ -1,39 +1,60 @@
 services:
   web:
     build: .
+    container_name: quantumguide-web
+    restart: unless-stopped
     ports:
-      - "3000:3000"       # Port web standar production
+      # Hanya listen di localhost (aman dari akses luar, dilewatkan via Nginx)
+      # Port host dinamis lewat .env agar mudah diganti jika bentrok
+      - "127.0.0.1:${APP_PORT:-3005}:3000"
     environment:
+      - NODE_ENV=production
       - PORT=3000
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD}   # Membaca password dari file .env
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=quantumguide
+      - COMPANY_AUTH_API_URL=${COMPANY_AUTH_API_URL}
+    volumes:
+      # Wajib agar file video tidak hilang saat container di-rebuild
+      - ./public/videos:/app/public/videos
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - quantumguide_net
 
   db:
     build:
       context: .
       dockerfile: Dockerfile.db
+    container_name: quantumguide-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD} # Membaca password dari file .env
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: quantumguide
     command: ["postgres", "-c", "shared_preload_libraries=pg_cron", "-c", "cron.database_name=quantumguide"]
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - quantumguide_pgdata:/var/lib/postgresql/data
       - ./init-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
       - ./Essential/quantumguide.sql:/docker-entrypoint-initdb.d/02-quantumguide.sql
+    # Opsional: Hapus bagian 'ports' ini jika tidak butuh akses DB langsung dari host/SSH
     ports:
-      - "127.0.0.1:5433:5432"  # Hanya mengizinkan akses DB dari internal server (Aman!)
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d quantumguide"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - quantumguide_net
 
 volumes:
-  pgdata:
+  quantumguide_pgdata:
+    name: quantumguide_pgdata
+
+networks:
+  quantumguide_net:
+    driver: bridge

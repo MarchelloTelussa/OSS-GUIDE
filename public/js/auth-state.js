@@ -62,7 +62,7 @@ if (userLink) {
 
         const isConfirmed = await CustomDialog.showConfirm({
             title: 'Konfirmasi Logout',
-            message: 'Logout dari OSS Guide?',
+            message: 'Logout dari QuantumGuide?',
             confirmText: 'Logout',
             cancelText: 'Batal'
         });

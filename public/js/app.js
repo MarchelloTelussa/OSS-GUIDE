@@ -350,7 +350,7 @@ function renderDefaultView() {
         elements.typeIdentityContainer.className = 'typeIdentity default-landing-center';
         elements.typeIdentityContainer.innerHTML = `
             <div class="default-landing-content">
-                <h1>Quantum Guide</h1>
+                <h1>QuantumGuide</h1>
                 <p>
                     Selamat datang di <strong>QuantumGuide</strong>, pusat dokumentasi dan panduan resmi untuk seluruh ekosistem aplikasi PT Quantum Nusatama. 
                     Platform ini menyediakan panduan langkah demi langkah, serta dokumentasi video untuk membantu Anda mengoperasikan berbagai aplikasi perusahaan secara efisien.

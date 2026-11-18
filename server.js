@@ -26,7 +26,7 @@ const swaggerProtection = basicAuth({
     [process.env.SWAGGER_USER]: process.env.SWAGGER_PASS 
   },
   challenge: true, // Memunculkan popup login di browser
-  realm: 'OSS Guide Protected Documentation'
+  realm: 'QuantumGuide Protected Documentation'
 });
 app.use('/api-docs', swaggerProtection, swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 

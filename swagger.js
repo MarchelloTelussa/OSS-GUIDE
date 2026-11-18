@@ -3,8 +3,8 @@ import swaggerAutogen from 'swagger-autogen';
 
 const doc = {
   info: {
-    title: 'OSS Guide API Documentation',
-    description: 'Dokumentasi API dan Endpoint Manajemen OSS Guide',
+    title: 'QuantumGuide API Documentation',
+    description: 'Dokumentasi API dan Endpoint Manajemen QuantumGuide',
     version: '1.0.0'
   },
   host: '100.78.105.90:3000', // Sesuaikan port server kamu

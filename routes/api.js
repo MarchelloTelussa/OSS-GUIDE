@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logActivity, getActivityLogs } from '../middleware/logger.js';
+import { syncHrisUsers } from '../middleware/hrisSync.js';
 
 // Import fungsi sanitasi dari middleware
 import { cleanText, cleanRichText } from '../middleware/inputSanitize.js';
@@ -1506,8 +1507,215 @@ router.get('/admin/logs', requireAuth('ITAdmin'), async (req, res, next) => {
         const method = req.query.method || 'ALL';
 
         const result = await getActivityLogs(page, limit, method);
-        
+
         res.json(result);
+    } catch (error) {
+        next(error);
+    }
+});
+
+// =====================================================================
+//  ADMIN: KELOLA AKSES USER (Khusus ITAdmin)
+// =====================================================================
+
+// GET /api/admin/hris-users — user HRIS (dari cache) yang BELUM ada di tabel users
+router.get('/admin/hris-users', requireAuth('ITAdmin'), async (req, res, next) => {
+    /*
+        #swagger.tags = ['Admin Akses User']
+        #swagger.summary = 'Daftar user HRIS yang belum punya akses QuantumGuide (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+    */
+    try {
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+        const offset = (page - 1) * limit;
+        const search = (req.query.search || '').toString().trim();
+
+        const params = [];
+        let whereSearch = '';
+        if (search) {
+            params.push(`%${search}%`);
+            whereSearch = `AND c.username ILIKE $${params.length}`;
+        }
+
+        const baseWhere = `
+            WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.username = c.username)
+            ${whereSearch}
+        `;
+
+        const countResult = await db.query(
+            `SELECT COUNT(*)::int AS total FROM hris_users_cache c ${baseWhere}`,
+            params
+        );
+        const totalRows = countResult.rows[0].total;
+        const totalPages = Math.ceil(totalRows / limit) || 1;
+
+        const dataParams = [...params, limit, offset];
+        const dataResult = await db.query(
+            `SELECT c.username, c.role_id AS "roleId"
+             FROM hris_users_cache c
+             ${baseWhere}
+             ORDER BY c.username ASC
+             LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+            dataParams
+        );
+
+        const lastSyncResult = await db.query('SELECT MAX(synced_at) AS last_sync FROM hris_users_cache');
+
+        res.json({
+            rows: dataResult.rows,
+            totalRows,
+            totalPages,
+            currentPage: page,
+            lastSync: lastSyncResult.rows[0].last_sync,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// GET /api/admin/app-users — user QuantumGuide yang sudah punya akses
+router.get('/admin/app-users', requireAuth('ITAdmin'), async (req, res, next) => {
+    /*
+        #swagger.tags = ['Admin Akses User']
+        #swagger.summary = 'Daftar user QuantumGuide (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+    */
+    try {
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+        const offset = (page - 1) * limit;
+
+        const countResult = await db.query('SELECT COUNT(*)::int AS total FROM users');
+        const totalRows = countResult.rows[0].total;
+        const totalPages = Math.ceil(totalRows / limit) || 1;
+
+        const dataResult = await db.query(
+            `SELECT username, role, (password IS NOT NULL) AS "hasPassword"
+             FROM users
+             ORDER BY username ASC
+             LIMIT $1 OFFSET $2`,
+            [limit, offset]
+        );
+
+        res.json({
+            rows: dataResult.rows,
+            totalRows,
+            totalPages,
+            currentPage: page,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST /api/admin/grant-access — salin user HRIS terpilih ke tabel users
+router.post('/admin/grant-access', requireAuth('ITAdmin'), async (req, res, next) => {
+    /*
+        #swagger.tags = ['Admin Akses User']
+        #swagger.summary = 'Beri akses login ke user HRIS terpilih (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+    */
+    const client = await db.getClient();
+    try {
+        const usernames = Array.isArray(req.body?.usernames) ? req.body.usernames : [];
+        const clean = [...new Set(
+            usernames.map((u) => (u == null ? '' : String(u).trim())).filter(Boolean)
+        )];
+
+        if (clean.length === 0) {
+            client.release();
+            return res.status(400).json({ error: 'Tidak ada username yang dipilih.' });
+        }
+
+        await client.query('BEGIN');
+
+        let granted = 0;
+        for (const username of clean) {
+            // Ambil role_id dari cache HRIS untuk menentukan role lokal
+            const { rows: cacheRows } = await client.query(
+                'SELECT role_id FROM hris_users_cache WHERE username = $1',
+                [username]
+            );
+            const roleId = cacheRows[0]?.role_id ?? null;
+            const role = (roleId === 1 || username.toLowerCase() === 'itadmin') ? 'ITAdmin' : 'user';
+
+            const result = await client.query(
+                `INSERT INTO users (username, password, role, token_version)
+                 VALUES ($1, NULL, $2, 0)
+                 ON CONFLICT (username) DO NOTHING`,
+                [username, role]
+            );
+            granted += result.rowCount;
+        }
+
+        await client.query('COMMIT');
+
+        await logActivity(req, `Memberi akses login: ${clean.join(', ')}`);
+
+        res.json({ granted, requested: clean.length });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+        next(error);
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/admin/hris-users/refresh — paksa sinkronisasi cache HRIS sekarang
+router.post('/admin/hris-users/refresh', requireAuth('ITAdmin'), async (req, res, next) => {
+    /*
+        #swagger.tags = ['Admin Akses User']
+        #swagger.summary = 'Refresh cache user HRIS sekarang (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+    */
+    try {
+        const result = await syncHrisUsers();
+        if (!result.ok) {
+            return res.status(502).json({ error: `Gagal menyinkronkan data HRIS: ${result.error}` });
+        }
+        await logActivity(req, `Refresh cache user HRIS (${result.count} user)`);
+        res.json({ message: 'Cache user HRIS berhasil diperbarui.', count: result.count });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// POST /api/admin/revoke-access — hapus user terpilih dari tabel users QuantumGuide.
+// FK activity_logs.user_id ON DELETE SET NULL, jadi riwayat log tetap tersimpan.
+router.post('/admin/revoke-access', requireAuth('ITAdmin'), async (req, res, next) => {
+    /*
+        #swagger.tags = ['Admin Akses User']
+        #swagger.summary = 'Cabut akses login user terpilih (Khusus ITAdmin)'
+        #swagger.security = [{ "bearerAuth": [] }]
+    */
+    try {
+        const usernames = Array.isArray(req.body?.usernames) ? req.body.usernames : [];
+        const clean = [...new Set(
+            usernames.map((u) => (u == null ? '' : String(u).trim())).filter(Boolean)
+        )];
+
+        if (clean.length === 0) {
+            return res.status(400).json({ error: 'Tidak ada username yang dipilih.' });
+        }
+
+        // Pengaman: admin tidak boleh mencabut akunnya sendiri.
+        const self = req.user?.username;
+        const targets = clean.filter((u) => u !== self);
+        const skippedSelf = clean.length !== targets.length;
+
+        if (targets.length === 0) {
+            return res.status(400).json({ error: 'Anda tidak dapat mencabut akses akun Anda sendiri.' });
+        }
+
+        const result = await db.query(
+            'DELETE FROM users WHERE username = ANY($1::varchar[]) RETURNING username',
+            [targets]
+        );
+
+        await logActivity(req, `Mencabut akses login: ${result.rows.map((r) => r.username).join(', ')}`);
+
+        res.json({ revoked: result.rowCount, skippedSelf });
     } catch (error) {
         next(error);
     }

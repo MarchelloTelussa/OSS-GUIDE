@@ -1,10 +1,32 @@
 import express from 'express';
 import db from '../db.js';
-import { verifyPassword, DUMMY_HASH } from '../middleware/password.js';
+import { hashPassword, verifyPassword } from '../middleware/password.js';
 import { COOKIE_NAME, generateToken, cookieOptions, requireAuth } from '../middleware/session.js';
 import { loginRateLimiter, botDetector } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
+
+// Helper: terbitkan sesi lokal (naikkan token_version -> sesi tunggal) & set cookie
+async function issueSession(res, req, userId) {
+    const { rows } = await db.query(
+        `UPDATE users
+         SET token_version = token_version + 1
+         WHERE id = $1
+         RETURNING id, username, role, token_version`,
+        [userId]
+    );
+    const user = rows[0];
+
+    const token = generateToken({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        tokenVersion: user.token_version,
+    });
+
+    res.cookie(COOKIE_NAME, token, cookieOptions(req));
+    return user;
+}
 
 router.post('/login', botDetector, loginRateLimiter, async (req, res, next) => {
     const { username, password } = req.body || {};
@@ -16,82 +38,61 @@ router.post('/login', botDetector, loginRateLimiter, async (req, res, next) => {
     const cleanUsername = username.trim();
 
     try {
-        // 1. Hit API Login Perusahaan
-        // Sesuaikan key payload (misal: username/email/nik) dengan Swagger perusahaan
-        const companyRes = await fetch(process.env.COMPANY_AUTH_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                username: cleanUsername,
-                password: password
-            }),
-            signal: AbortSignal.timeout(8000) // Batas waktu 8 detik
-        });
+        // 1. Cari user di tabel lokal (sumber kebenaran login sekarang)
+        const { rows } = await db.query(
+            'SELECT id, username, password, role, token_version FROM users WHERE username = $1',
+            [cleanUsername]
+        );
+        const user = rows[0];
 
-        const companyData = await companyRes.json().catch(() => ({}));
-
-        // 2. Cek apakah login ditolak oleh server perusahaan
-        // (Jika API perusahaan selalu return HTTP 200 dengan flag success: false, tambahkan: || companyData.success === false)
-        if (!companyRes.ok) {
+        // 2. User tidak ada = belum diberi akses oleh admin
+        if (!user) {
             if (req.rateLimit) req.rateLimit.increment();
-            return res.status(401).json({ 
-                error: companyData.message || 'Username atau password salah' 
+            return res.status(401).json({
+                error: 'Akun Anda belum diberi akses login. Login dibatasi oleh admin — silakan hubungi admin.'
             });
         }
 
-        // Reset rate limiter jika berhasil login
+        // 3. User sudah punya password lokal -> verifikasi lokal (scrypt)
+        if (user.password) {
+            const valid = await verifyPassword(password, user.password);
+            if (!valid) {
+                if (req.rateLimit) req.rateLimit.increment();
+                return res.status(401).json({ error: 'Username atau password salah' });
+            }
+        } else {
+            // 4. User sudah di-grant tapi belum punya password lokal (password NULL).
+            //    Validasi SEKALI ke API login HRIS; jika benar, hash & simpan lokal.
+            const companyRes = await fetch(process.env.COMPANY_AUTH_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ username: cleanUsername, password }),
+                signal: AbortSignal.timeout(8000),
+            });
+
+            if (!companyRes.ok) {
+                const companyData = await companyRes.json().catch(() => ({}));
+                if (req.rateLimit) req.rateLimit.increment();
+                return res.status(401).json({
+                    error: companyData.message || 'Username atau password salah'
+                });
+            }
+
+            const hashed = await hashPassword(password);
+            await db.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, user.id]);
+        }
+
+        // 5. Sukses: reset rate limiter, terbitkan sesi lokal
         if (req.rateLimit) req.rateLimit.reset();
+        const sessionUser = await issueSession(res, req, user.id);
 
-        // 3. Ekstrak & Mapping Role dari Response JSON Perusahaan
-        // Sesuaikan path objek dengan struktur response Swagger (misal: companyData.roleName atau companyData.data?.roleName)
-        const rawRole = (
-            companyData.roleName || 
-            companyData.data?.roleName || 
-            companyData.user?.roleName || 
-            ''
-        ).toString().trim().toLowerCase();
-
-        // Hanya "super admin" yang menjadi "ITAdmin", sisanya (termasuk "IT" biasa) otomatis menjadi "user"
-        const mappedRole = rawRole === 'super admin' ? 'ITAdmin' : 'user';
-
-        // 4. JIT Provisioning (UPSERT ke tabel users lokal & increment token_version)
-        const upsertQuery = `
-            INSERT INTO users (username, password, role, token_version)
-            VALUES ($1, NULL, $2, 1)
-            ON CONFLICT (username) 
-            DO UPDATE SET 
-                role = EXCLUDED.role,
-                token_version = users.token_version + 1
-            RETURNING id, username, role, token_version;
-        `;
-
-        const { rows } = await db.query(upsertQuery, [cleanUsername, mappedRole]);
-        const user = rows[0];
-
-        // 5. Generate JWT lokal dengan menyertakan tokenVersion terbaru
-        const token = generateToken({
-            id: user.id,
-            username: user.username,
-            role: user.role,
-            tokenVersion: user.token_version
-        });
-
-        // 6. Set HTTP-Only Cookie (membaca header X-Forwarded-Proto dari Nginx)
-        res.cookie(COOKIE_NAME, token, cookieOptions(req));
-
-        return res.json({ 
-            username: user.username, 
-            role: user.role 
-        });
+        return res.json({ username: sessionUser.username, role: sessionUser.role });
 
     } catch (error) {
         if (error.name === 'TimeoutError' || error.code === 'ECONNREFUSED') {
             console.error('[Auth Error] Gagal terhubung ke API Perusahaan:', error.message);
-            return res.status(503).json({ 
-                error: 'Server autentikasi perusahaan sedang tidak dapat dijangkau.' 
+            return res.status(503).json({
+                error: 'Server autentikasi perusahaan sedang tidak dapat dijangkau. Coba lagi nanti.'
             });
         }
         next(error);

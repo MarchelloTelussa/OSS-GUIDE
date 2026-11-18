@@ -21,6 +21,16 @@ let currentLogPage = 1;
 let currentMethodFilter = 'ALL';
 const LOGS_PER_PAGE = 10;
 
+// State view "Kelola Akses User"
+const ACCESS_PER_PAGE = 10;
+const accessState = {
+    hrisPage: 1,
+    hrisSearch: '',
+    appPage: 1,
+    selected: new Set(),    // username HRIS yang dicentang (untuk grant)
+    selectedApp: new Set(), // username QuantumGuide yang dicentang (untuk revoke)
+};
+
 /**
  * Initialize Dashboard & Authenticate User
  */
@@ -45,6 +55,7 @@ function injectAdminDOM() {
     if (typeManageContainer) {
         typeManageContainer.innerHTML = `
             <button id="btnActivityLog" title="Log Aktivitas Admin"><i class="fa-solid fa-bell fa-lg"></i></button>
+            <button id="btnUserAccess" title="Kelola Akses User"><i class="fa-solid fa-user-plus fa-lg"></i></button>
             <button id="btnManage" title="Manage Category & Type"><i class="fa-solid fa-folder-plus fa-lg"></i></button>
         `;
     }
@@ -197,6 +208,7 @@ function cacheDOMElements() {
         // Admin Elements
         btnManage: document.getElementById('btnManage'),
         btnActivityLog: document.getElementById('btnActivityLog'),
+        btnUserAccess: document.getElementById('btnUserAccess'),
         backdrop: document.getElementById('backdrop'),
 
         // Manage Modal & Tabs
@@ -275,6 +287,7 @@ function setupEventListeners() {
     // Admin Listeners
     if (elements.btnManage) elements.btnManage.addEventListener('click', openManageModal);
     if (elements.btnActivityLog) elements.btnActivityLog.addEventListener('click', () => renderActivityLogView(1));
+    if (elements.btnUserAccess) elements.btnUserAccess.addEventListener('click', () => renderUserAccessView());
     if (elements.closeManageModal) elements.closeManageModal.addEventListener('click', closeAllModals);
     if (elements.closeEditModal) elements.closeEditModal.addEventListener('click', closeAllModals);
     if (elements.closeEditParentModal) elements.closeEditParentModal.addEventListener('click', closeAllModals);
@@ -416,6 +429,460 @@ async function renderActivityLogView(page = 1) {
     });
 
     await fetchAndRenderLogs(currentLogPage, currentMethodFilter);
+}
+
+/* =====================================================================
+ *  VIEW: KELOLA AKSES USER (Khusus ITAdmin)
+ * ===================================================================== */
+
+/**
+ * Render shell view 2 kolom: kiri = user HRIS (belum punya akses),
+ * kanan = user QuantumGuide. Meniru pola renderActivityLogView.
+ */
+async function renderUserAccessView() {
+    accessState.hrisPage = 1;
+    accessState.appPage = 1;
+    accessState.hrisSearch = '';
+    accessState.selected = new Set();
+    accessState.selectedApp = new Set();
+
+    state.selectedTypeId = null;
+    renderTypeTabs();
+
+    if (elements.guideGroupContainer) {
+        elements.guideGroupContainer.innerHTML = '';
+        elements.guideGroupContainer.style.display = 'none';
+    }
+
+    if (!elements.typeIdentityContainer) return;
+
+    elements.typeIdentityContainer.className = 'typeIdentity user-access-view';
+    elements.typeIdentityContainer.innerHTML = `
+        <div class="logContainerHeader">
+            <h2><i class="fa-solid fa-user-plus"></i> Kelola Akses User</h2>
+            <div class="logHeaderActions">
+                <button id="btnRefreshHris" class="accessRefreshBtn" title="Refresh data user HRIS">
+                    <i class="fa-solid fa-rotate"></i> Refresh
+                </button>
+                <button id="btnCloseAccessView" class="closeModalBtn" title="Tutup">&times;</button>
+            </div>
+        </div>
+
+        <p class="accessSyncInfo" id="accessSyncInfo"></p>
+
+        <div class="accessGrid">
+            <section class="accessCol">
+                <div class="accessColHead">
+                    <h3>User HRIS (belum punya akses)</h3>
+                    <input type="text" id="hrisSearchInput" class="accessSearch" placeholder="Cari username..." />
+                </div>
+                <div id="hrisListContent" class="accessListContent">
+                    <p class="accessLoading">Memuat data...</p>
+                </div>
+                <div id="hrisPagination" class="logPaginationContainer"></div>
+                <div class="accessActionBar">
+                    <span id="accessSelectedCount" class="accessSelectedCount"></span>
+                    <button id="btnGrantAccess" class="accessGrantBtn" style="display:none;">
+                        <i class="fa-solid fa-key"></i> Akses (<span id="grantCount">0</span>)
+                    </button>
+                </div>
+            </section>
+
+            <section class="accessCol">
+                <div class="accessColHead">
+                    <h3>User QuantumGuide</h3>
+                </div>
+                <div id="appListContent" class="accessListContent">
+                    <p class="accessLoading">Memuat data...</p>
+                </div>
+                <div id="appPagination" class="logPaginationContainer"></div>
+                <div class="accessActionBar">
+                    <span id="revokeSelectedCount" class="accessSelectedCount"></span>
+                    <button id="btnRevokeAccess" class="accessRevokeBtn" style="display:none;">
+                        <i class="fa-solid fa-user-slash"></i> Cabut Akses (<span id="revokeCount">0</span>)
+                    </button>
+                </div>
+            </section>
+        </div>
+    `;
+
+    document.getElementById('btnCloseAccessView')?.addEventListener('click', renderDefaultView);
+
+    document.getElementById('btnRefreshHris')?.addEventListener('click', handleRefreshHris);
+
+    let searchTimer = null;
+    document.getElementById('hrisSearchInput')?.addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        const val = e.target.value;
+        searchTimer = setTimeout(() => {
+            accessState.hrisSearch = val.trim();
+            accessState.hrisPage = 1;
+            fetchAndRenderHrisUsers();
+        }, 350);
+    });
+
+    document.getElementById('btnGrantAccess')?.addEventListener('click', handleGrantAccess);
+    document.getElementById('btnRevokeAccess')?.addEventListener('click', handleRevokeAccess);
+
+    await Promise.all([fetchAndRenderHrisUsers(), fetchAndRenderAppUsers()]);
+}
+
+function renderGenericPagination(container, currentPage, totalPages, onGo) {
+    if (!container) return;
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+    const pageRange = generatePaginationRange(currentPage, totalPages);
+    const pageButtons = pageRange.map(item => {
+        if (item === '...') return `<span class="logPageEllipsis">...</span>`;
+        return `<button class="logPageBtn ${item === currentPage ? 'active' : ''}" data-page="${item}">${item}</button>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="logPaginationWrapper">
+            <button class="logPageBtn navBtn" data-nav="prev" ${currentPage <= 1 ? 'disabled' : ''}>
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <div class="logPageNumbers">${pageButtons}</div>
+            <button class="logPageBtn navBtn" data-nav="next" ${currentPage >= totalPages ? 'disabled' : ''}>
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+    `;
+
+    container.querySelector('[data-nav="prev"]')?.addEventListener('click', () => {
+        if (currentPage > 1) onGo(currentPage - 1);
+    });
+    container.querySelector('[data-nav="next"]')?.addEventListener('click', () => {
+        if (currentPage < totalPages) onGo(currentPage + 1);
+    });
+    container.querySelectorAll('.logPageNumbers .logPageBtn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const target = parseInt(e.currentTarget.getAttribute('data-page'), 10);
+            if (target !== currentPage) onGo(target);
+        });
+    });
+}
+
+function updateGrantButton() {
+    const count = accessState.selected.size;
+    const btn = document.getElementById('btnGrantAccess');
+    const countEl = document.getElementById('grantCount');
+    const selectedCountEl = document.getElementById('accessSelectedCount');
+    if (countEl) countEl.textContent = count;
+    if (btn) btn.style.display = count > 0 ? 'inline-flex' : 'none';
+    if (selectedCountEl) selectedCountEl.textContent = count > 0 ? `${count} user dipilih` : '';
+}
+
+async function fetchAndRenderHrisUsers() {
+    const listEl = document.getElementById('hrisListContent');
+    const pagEl = document.getElementById('hrisPagination');
+    const syncEl = document.getElementById('accessSyncInfo');
+    if (listEl) listEl.innerHTML = '<p class="accessLoading">Memuat data...</p>';
+
+    try {
+        const params = new URLSearchParams({
+            page: accessState.hrisPage,
+            limit: ACCESS_PER_PAGE,
+            search: accessState.hrisSearch,
+        });
+        const response = await fetch(`${API_BASE}/admin/hris-users?${params.toString()}`);
+        if (!response.ok) throw new Error('Gagal mengambil data user HRIS');
+
+        const { rows, totalPages, currentPage, lastSync } = await response.json();
+        if (!listEl) return;
+
+        if (syncEl) {
+            syncEl.textContent = lastSync
+                ? `Terakhir sinkron HRIS: ${new Date(lastSync).toLocaleString('id-ID')}`
+                : 'Data HRIS belum pernah disinkronkan.';
+        }
+
+        if (!rows || rows.length === 0) {
+            listEl.innerHTML = '<p class="accessEmpty">Tidak ada user HRIS yang belum punya akses.</p>';
+            if (pagEl) pagEl.innerHTML = '';
+            return;
+        }
+
+        listEl.innerHTML = `
+            <table class="logTable accessTable">
+                <thead>
+                    <tr>
+                        <th class="accessCheckCol"><input type="checkbox" id="hrisCheckAll" title="Pilih semua di halaman ini" /></th>
+                        <th>Username</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(u => `
+                        <tr>
+                            <td class="accessCheckCol">
+                                <input type="checkbox" class="hrisRowCheck" value="${escapeHTML(u.username)}"
+                                    ${accessState.selected.has(u.username) ? 'checked' : ''} />
+                            </td>
+                            <td>${escapeHTML(u.username)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        const pageUsernames = rows.map(u => u.username);
+        const allChecked = pageUsernames.every(n => accessState.selected.has(n));
+        const checkAll = document.getElementById('hrisCheckAll');
+        if (checkAll) checkAll.checked = allChecked;
+
+        listEl.querySelectorAll('.hrisRowCheck').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const uname = e.target.value;
+                if (e.target.checked) accessState.selected.add(uname);
+                else accessState.selected.delete(uname);
+                const all = pageUsernames.every(n => accessState.selected.has(n));
+                if (checkAll) checkAll.checked = all;
+                updateGrantButton();
+            });
+        });
+
+        checkAll?.addEventListener('change', (e) => {
+            pageUsernames.forEach(n => {
+                if (e.target.checked) accessState.selected.add(n);
+                else accessState.selected.delete(n);
+            });
+            listEl.querySelectorAll('.hrisRowCheck').forEach(cb => { cb.checked = e.target.checked; });
+            updateGrantButton();
+        });
+
+        updateGrantButton();
+
+        renderGenericPagination(pagEl, currentPage, totalPages, (p) => {
+            accessState.hrisPage = p;
+            fetchAndRenderHrisUsers();
+        });
+    } catch (err) {
+        console.error(err);
+        if (listEl) listEl.innerHTML = '<p class="accessEmpty">Gagal memuat data user HRIS.</p>';
+    }
+}
+
+function updateRevokeButton() {
+    const count = accessState.selectedApp.size;
+    const btn = document.getElementById('btnRevokeAccess');
+    const countEl = document.getElementById('revokeCount');
+    const selectedCountEl = document.getElementById('revokeSelectedCount');
+    if (countEl) countEl.textContent = count;
+    if (btn) btn.style.display = count > 0 ? 'inline-flex' : 'none';
+    if (selectedCountEl) selectedCountEl.textContent = count > 0 ? `${count} user dipilih` : '';
+}
+
+async function fetchAndRenderAppUsers() {
+    const listEl = document.getElementById('appListContent');
+    const pagEl = document.getElementById('appPagination');
+    if (listEl) listEl.innerHTML = '<p class="accessLoading">Memuat data...</p>';
+
+    const me = getCurrentUser();
+    const myUsername = me ? me.username : null;
+
+    try {
+        const params = new URLSearchParams({ page: accessState.appPage, limit: ACCESS_PER_PAGE });
+        const response = await fetch(`${API_BASE}/admin/app-users?${params.toString()}`);
+        if (!response.ok) throw new Error('Gagal mengambil data user QuantumGuide');
+
+        const { rows, totalPages, currentPage } = await response.json();
+        if (!listEl) return;
+
+        if (!rows || rows.length === 0) {
+            listEl.innerHTML = '<p class="accessEmpty">Belum ada user QuantumGuide.</p>';
+            if (pagEl) pagEl.innerHTML = '';
+            return;
+        }
+
+        listEl.innerHTML = `
+            <table class="logTable accessTable">
+                <thead>
+                    <tr>
+                        <th class="accessCheckCol"><input type="checkbox" id="appCheckAll" title="Pilih semua di halaman ini" /></th>
+                        <th>Username</th><th>Role</th><th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(u => {
+                        const isSelf = u.username === myUsername;
+                        return `
+                        <tr>
+                            <td class="accessCheckCol">
+                                <input type="checkbox" class="appRowCheck" value="${escapeHTML(u.username)}"
+                                    ${accessState.selectedApp.has(u.username) ? 'checked' : ''}
+                                    ${isSelf ? 'disabled title="Tidak bisa mencabut akun sendiri"' : ''} />
+                            </td>
+                            <td>${escapeHTML(u.username)}</td>
+                            <td><span class="roleBadge ${u.role === 'ITAdmin' ? 'roleAdmin' : 'roleUser'}">${escapeHTML(u.role || '-')}</span></td>
+                            <td>${u.hasPassword
+                                ? '<span class="pwStatus pwSet">Aktif</span>'
+                                : '<span class="pwStatus pwPending">Belum login</span>'}</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+
+        const selectableUsernames = rows.map(u => u.username).filter(n => n !== myUsername);
+        const checkAll = document.getElementById('appCheckAll');
+        const syncCheckAll = () => {
+            if (checkAll) {
+                checkAll.checked = selectableUsernames.length > 0
+                    && selectableUsernames.every(n => accessState.selectedApp.has(n));
+            }
+        };
+        syncCheckAll();
+
+        listEl.querySelectorAll('.appRowCheck').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const uname = e.target.value;
+                if (e.target.checked) accessState.selectedApp.add(uname);
+                else accessState.selectedApp.delete(uname);
+                syncCheckAll();
+                updateRevokeButton();
+            });
+        });
+
+        checkAll?.addEventListener('change', (e) => {
+            selectableUsernames.forEach(n => {
+                if (e.target.checked) accessState.selectedApp.add(n);
+                else accessState.selectedApp.delete(n);
+            });
+            listEl.querySelectorAll('.appRowCheck:not(:disabled)').forEach(cb => { cb.checked = e.target.checked; });
+            updateRevokeButton();
+        });
+
+        updateRevokeButton();
+
+        renderGenericPagination(pagEl, currentPage, totalPages, (p) => {
+            accessState.appPage = p;
+            fetchAndRenderAppUsers();
+        });
+    } catch (err) {
+        console.error(err);
+        if (listEl) listEl.innerHTML = '<p class="accessEmpty">Gagal memuat data user QuantumGuide.</p>';
+    }
+}
+
+async function handleRevokeAccess() {
+    const usernames = Array.from(accessState.selectedApp);
+    if (usernames.length === 0) return;
+
+    const confirmed = await CustomDialog.showConfirm({
+        title: 'Cabut Akses Login',
+        message: `Cabut akses & hapus ${usernames.length} user terpilih dari QuantumGuide? Mereka akan muncul kembali di daftar HRIS dan tidak bisa login lagi.`,
+        confirmText: 'Cabut Akses',
+        cancelText: 'Batal',
+    });
+    if (!confirmed) return;
+
+    const btn = document.getElementById('btnRevokeAccess');
+    if (btn) btn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/admin/revoke-access`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usernames }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal mencabut akses');
+
+        accessState.selectedApp = new Set();
+        accessState.hrisPage = 1;
+
+        // Refresh kedua kolom: user hilang dari kanan, muncul lagi di kiri (bila ada di cache HRIS)
+        await Promise.all([fetchAndRenderHrisUsers(), fetchAndRenderAppUsers()]);
+
+        await CustomDialog.showAlert({
+            title: 'Berhasil',
+            message: `${data.revoked} user berhasil dicabut aksesnya.`,
+            type: 'success',
+        });
+    } catch (err) {
+        await CustomDialog.showAlert({
+            title: 'Gagal',
+            message: err.message || 'Terjadi kesalahan saat mencabut akses.',
+            type: 'danger',
+        });
+    } finally {
+        if (btn) btn.disabled = false;
+        updateRevokeButton();
+    }
+}
+
+async function handleGrantAccess() {
+    const usernames = Array.from(accessState.selected);
+    if (usernames.length === 0) return;
+
+    const confirmed = await CustomDialog.showConfirm({
+        title: 'Beri Akses Login',
+        message: `Beri akses login ke ${usernames.length} user terpilih? Mereka bisa login dengan password HRIS mereka.`,
+        confirmText: 'Beri Akses',
+        cancelText: 'Batal',
+    });
+    if (!confirmed) return;
+
+    const btn = document.getElementById('btnGrantAccess');
+    if (btn) { btn.disabled = true; }
+
+    try {
+        const response = await fetch(`${API_BASE}/admin/grant-access`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usernames }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal memberi akses');
+
+        accessState.selected = new Set();
+        accessState.hrisPage = 1;
+
+        // Refresh kedua kolom: user ter-grant hilang dari kiri, muncul di kanan
+        await Promise.all([fetchAndRenderHrisUsers(), fetchAndRenderAppUsers()]);
+
+        await CustomDialog.showAlert({
+            title: 'Berhasil',
+            message: `${data.granted} user berhasil diberi akses login.`,
+            type: 'success',
+        });
+    } catch (err) {
+        await CustomDialog.showAlert({
+            title: 'Gagal',
+            message: err.message || 'Terjadi kesalahan saat memberi akses.',
+            type: 'danger',
+        });
+    } finally {
+        if (btn) btn.disabled = false;
+        updateGrantButton();
+    }
+}
+
+async function handleRefreshHris() {
+    const btn = document.getElementById('btnRefreshHris');
+    if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+    try {
+        const response = await fetch(`${API_BASE}/admin/hris-users/refresh`, { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal me-refresh data HRIS');
+
+        accessState.hrisPage = 1;
+        await fetchAndRenderHrisUsers();
+
+        await CustomDialog.showAlert({
+            title: 'Berhasil',
+            message: `Data HRIS diperbarui (${data.count} user).`,
+            type: 'success',
+        });
+    } catch (err) {
+        await CustomDialog.showAlert({
+            title: 'Gagal',
+            message: err.message || 'Terjadi kesalahan saat me-refresh data HRIS.',
+            type: 'danger',
+        });
+    } finally {
+        if (btn) { btn.disabled = false; btn.classList.remove('spinning'); }
+    }
 }
 
 function generatePaginationRange(currentPage, totalPages) {

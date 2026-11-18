@@ -38,7 +38,7 @@
         main {height: calc(100vh - 3.5rem); overflow: hidden; margin: 0.25rem 5rem 0; border: 1px solid black;}
         .content {display: flex; flex-direction: column; height: 100%;}
         .typeContainer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 1rem 0 0; width: 100%; min-height: 2.75rem; background-color: var(--main); overflow: visible; }
-        .typeGroup { display: flex; flex-direction: row; height: 100%; min-height: 2.75rem; align-items: center; overflow: visible; }
+        .typeGroup { display: flex; flex-direction: row; height: 100%; min-height: 2.75rem; align-items: center; overflow: visible;}
         .typeDropdown { position: relative; height: 100%; display: flex; align-items: center; }
         .dropdownBtn { display: flex; align-items: center; gap: 0.5rem; padding: 0 1.25rem; height: 100%; min-height: 2.75rem; background: none; border: none; color: white; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; box-sizing: border-box; }
         .dropdownBtn:hover, .dropdownBtn.active { background-color: var(--second); }
@@ -91,6 +91,54 @@
         .badge-method.POST { background-color: #007bff; }
         .badge-method.PUT { background-color: #ffc107; color: #000000; }
         .badge-method.DELETE { background-color: #dc3545; }
+
+        /* ===== Kelola Akses User ===== */
+        #btnUserAccess { background: transparent; border: none; color: white; cursor: pointer; padding: 0.4rem; font-size: 1.1rem; }
+        #btnUserAccess:hover { color: var(--outline); }
+
+        .typeIdentity.user-access-view { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; padding: 1.5rem; box-sizing: border-box; background: #ffffff; border-radius: 8px; border: 1px solid var(--outline); }
+
+        .accessRefreshBtn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--outline, #ccc); background: #fff; color: var(--main, #333); font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+        .accessRefreshBtn:hover:not(:disabled) { border-color: var(--main); color: var(--main); background: #f8f9fa; }
+        .accessRefreshBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .accessRefreshBtn.spinning i { animation: accessSpin 0.8s linear infinite; }
+        @keyframes accessSpin { to { transform: rotate(360deg); } }
+
+        .accessSyncInfo { font-size: 0.8rem; color: var(--text2, #888); margin: 0 0 0.75rem; flex-shrink: 0; }
+
+        .accessGrid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; min-height: 0; }
+        .accessCol { display: flex; flex-direction: column; min-height: 0; border: 1px solid #eee; border-radius: 8px; padding: 0.75rem; box-sizing: border-box; }
+        .accessColHead { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; flex-shrink: 0; flex-wrap: wrap; }
+        .accessColHead h3 { font-size: 1rem; color: var(--main); margin: 0; }
+        .accessSearch { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--outline, #ccc); font-size: 0.85rem; outline: none; }
+        .accessSearch:focus { border-color: var(--main); }
+
+        .accessListContent { flex: 1; overflow-y: auto; overflow-x: auto; width: 100%; min-height: 120px; }
+        .accessTable .accessCheckCol { width: 42px; text-align: center; }
+        .accessTable input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+        .accessLoading, .accessEmpty { text-align: center; color: var(--text2, #888); padding: 1.5rem; }
+
+        .accessActionBar { display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; padding-top: 0.75rem; margin-top: 0.5rem; border-top: 1px solid #eee; flex-shrink: 0; min-height: 44px; }
+        .accessSelectedCount { font-size: 0.85rem; color: var(--text2, #888); }
+        .accessGrantBtn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 8px 16px; border-radius: 6px; border: none; background: var(--main, #007bff); color: #fff; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        .accessGrantBtn:hover:not(:disabled) { opacity: 0.9; }
+        .accessGrantBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .accessRevokeBtn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 8px 16px; border-radius: 6px; border: none; background: #dc3545; color: #fff; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        .accessRevokeBtn:hover:not(:disabled) { opacity: 0.9; }
+        .accessRevokeBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .roleBadge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; }
+        .roleBadge.roleAdmin { background: #ffe8d6; color: #b85c00; }
+        .roleBadge.roleUser { background: #e6f0ff; color: #0056b3; }
+        .pwStatus { font-size: 0.75rem; font-weight: 600; }
+        .pwStatus.pwSet { color: #28a745; }
+        .pwStatus.pwPending { color: #d08700; }
+
+        @media screen and (max-width: 820px) {
+            .accessGrid { grid-template-columns: 1fr; overflow-y: auto; }
+            .accessCol { min-height: 260px; }
+        }
 
         .typeIdentity { display: flex; flex-direction: column; width: 75%; height: 100%; padding: 1rem 2rem; background-color: var(--second2); overflow-y: hidden; }
         .typeIdentity.default-landing-center { display: flex; justify-content: center; align-items: center; width: 100%; text-align: center; padding: 2rem 1rem; }

@@ -18,6 +18,10 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=quantumguide
       - COMPANY_AUTH_API_URL=${COMPANY_AUTH_API_URL}
+      - HRIS_MASTER_USERS_URL=${HRIS_MASTER_USERS_URL}
+      - HRIS_API_TOKEN=${HRIS_API_TOKEN}
+      - HRIS_API_KEY=${HRIS_API_KEY}
+      - HRIS_API_KEY_HEADER=${HRIS_API_KEY_HEADER}
     volumes:
       # Wajib agar file video tidak hilang saat container di-rebuild
       - ./public/videos:/app/public/videos

@@ -5,6 +5,7 @@ import apiRouter from './routes/api.js';
 import authRouter from './routes/auth.js';
 import { sessionMiddleware } from './middleware/session.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { startHrisSyncScheduler } from './middleware/hrisSync.js';
 import { fileURLToPath } from 'url';
 import swaggerUi from 'swagger-ui-express';
 import basicAuth from 'express-basic-auth';
@@ -64,4 +65,6 @@ app.use(errorHandler);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running at http://0.0.0.0:${PORT}`);
+  // Mulai sinkronisasi cache user HRIS (sekali saat start bila stale, lalu tiap 1 jam)
+  startHrisSyncScheduler();
 });

@@ -6,6 +6,27 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logActivity, getActivityLogs } from '../middleware/logger.js';
 import { syncHrisUsers } from '../middleware/hrisSync.js';
+import sharp from 'sharp';
+import ffmpeg from 'fluent-ffmpeg';
+
+// Helper kompresi video ke MP4 (H.264, CRF 27, Faststart)
+function compressVideo(inputPath, outputPath) {
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .outputOptions([
+                '-c:v libx264',
+                '-crf 27',              // Keseimbangan ukuran & ketajaman teks layar (23-28 ideal)
+                '-preset veryfast',     // Hemat CPU saat encode
+                '-vf scale=\'min(1920,iw)\':-2', // Turunkan ke 1080p jika video asli 4K, tetap pertahankan rasio
+                '-c:a aac',
+                '-b:a 128k',
+                '-movflags +faststart'  // Agar video langsung bisa di-stream di browser
+            ])
+            .save(outputPath)
+            .on('end', () => resolve())
+            .on('error', (err) => reject(err));
+    });
+}
 
 // Import fungsi sanitasi dari middleware
 import { cleanText, cleanRichText } from '../middleware/inputSanitize.js';
@@ -631,8 +652,7 @@ router.put('/types/:id', requireAuth('ITAdmin'), async (req, res, next) => {
             parentTitle: parentRecord.title
         };
 
-        await logActivity(req, `Update Type: "${oldTitle}" menjadi "${responseData.title}" (ID: ${responseData.id})`);
-        res.json(responseData);
+        await logActivity(req, `Update Type: "${oldTitle}" menjadi "${responseData.title}" (ID: ${responseData.id})`);        res.json(responseData);
     } catch (error) {
         await client.query('ROLLBACK');
         next(error);
@@ -1329,10 +1349,13 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
         req.on('end', async () => {
             if (tooLarge) return;
+            let tempFilepath = null;
+
             try {
                 const buffer = Buffer.concat(chunks);
-                const contentType = req.headers['content-type'] || '';
+                chunks.length = 0; // Bebaskan RAM segera setelah concat
 
+                const contentType = req.headers['content-type'] || '';
                 if (!contentType.includes('multipart/form-data')) {
                     return res.status(400).json({ error: 'Invalid content type' });
                 }
@@ -1360,13 +1383,10 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 let typeNameFound = 'general';
                 if (groupIdParam) {
-                    const typeQuery = `
-                        SELECT t.title 
-                        FROM guide_groups gg 
-                        JOIN type t ON gg.type_id = t.id 
-                        WHERE gg.id = $1;
-                    `;
-                    const typeResult = await db.query(typeQuery, [groupIdParam]);
+                    const typeResult = await db.query(
+                        `SELECT t.title FROM guide_groups gg JOIN type t ON gg.type_id = t.id WHERE gg.id = $1;`,
+                        [groupIdParam]
+                    );
                     if (typeResult.rows.length > 0) {
                         typeNameFound = typeResult.rows[0].title;
                     }
@@ -1374,7 +1394,6 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
 
                 const safeTypeFolder = sanitizeFolderName(typeNameFound);
                 const safeTitleFolder = sanitizeFolderName(titleParam);
-                
                 const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
                 if (!fs.existsSync(targetDir)) {
@@ -1382,20 +1401,36 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 }
 
                 const timestamp = Date.now();
-                const safeFilename = `${timestamp}${extension}`;
-                const filepath = path.join(targetDir, safeFilename);
+                tempFilepath = path.join(targetDir, `raw_${timestamp}${extension}`);
+                const finalFilename = `${timestamp}.mp4`; // Selalu distandarisasi ke .mp4
+                const finalFilepath = path.join(targetDir, finalFilename);
 
-                fs.writeFileSync(filepath, videoFile.data);
+                // Tulis file mentah sementara, kompres, lalu hapus file mentah
+                await fs.promises.writeFile(tempFilepath, videoFile.data);
+                await compressVideo(tempFilepath, finalFilepath);
+                await fs.promises.unlink(tempFilepath);
+                tempFilepath = null;
 
-                const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${safeFilename}`;
+                // Kembalikan URL dengan ekstensi .mp4 final agar tersimpan akurat di DB
+                const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${finalFilename}`;
                 return res.json({ videoPath: videoUrl });
 
             } catch (error) {
+                if (tempFilepath && fs.existsSync(tempFilepath)) {
+                    await fs.promises.unlink(tempFilepath).catch(() => {});
+                }
                 next(error);
             }
         });
     } catch (error) {
-        next(error);
+        if (tempFilepath && fs.existsSync(tempFilepath)) {
+            await fs.promises.unlink(tempFilepath).catch(() => {});
+        }
+        console.error('[UPLOAD_ERROR]', error);
+        return res.status(500).json({
+            error: 'Gagal memproses atau mengompresi file media di server.',
+            reason: error.message || 'Kesalahan internal server saat kompresi'
+        });
     }
 });
 
@@ -1434,12 +1469,13 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
             chunks.push(chunk);
         });
 
-        req.on('end', () => {
+        req.on('end', async () => {
             if (tooLarge) return;
             try {
                 const buffer = Buffer.concat(chunks);
-                const contentType = req.headers['content-type'] || '';
+                chunks.length = 0;
 
+                const contentType = req.headers['content-type'] || '';
                 if (!contentType.includes('multipart/form-data')) {
                     return res.status(400).json({ error: 'Invalid content type' });
                 }
@@ -1472,10 +1508,14 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
                 }
 
                 const timestamp = Date.now();
-                const safeFilename = `img_${timestamp}${extension}`;
+                const safeFilename = `img_${timestamp}.webp`; // Output selalu .webp
                 const filepath = path.join(targetDir, safeFilename);
 
-                fs.writeFileSync(filepath, imageFile.data);
+                // Resize maksimal lebar 1280px (tanpa memperbesar gambar kecil) & kompres ke WebP
+                await sharp(imageFile.data)
+                    .resize({ width: 1280, withoutEnlargement: true })
+                    .webp({ quality: 80 })
+                    .toFile(filepath);
 
                 const imageRelPath = `/img/${safeTypeFolder}/${safeFilename}`;
                 return res.json({ imgUrl: imageRelPath });
@@ -1485,8 +1525,15 @@ router.post('/upload-image', requireAuth('ITAdmin'), async (req, res, next) => {
             }
         });
     } catch (error) {
-        next(error);
+    if (tempFilepath && fs.existsSync(tempFilepath)) {
+        await fs.promises.unlink(tempFilepath).catch(() => {});
     }
+    console.error('[UPLOAD_ERROR]', error);
+    return res.status(500).json({
+        error: 'Gagal memproses atau mengompresi file media di server.',
+        reason: error.message || 'Kesalahan internal server saat kompresi'
+    });
+}
 });
 
 // GET /api/admin/logs (Khusus ITAdmin)

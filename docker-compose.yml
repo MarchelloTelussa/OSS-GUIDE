@@ -22,6 +22,8 @@ services:
       - HRIS_API_TOKEN=${HRIS_API_TOKEN}
       - HRIS_API_KEY=${HRIS_API_KEY}
       - HRIS_API_KEY_HEADER=${HRIS_API_KEY_HEADER}
+      - SWAGGER_USER=${SWAGGER_USER}
+      - SWAGGER_PASS=${SWAGGER_PASS}
     volumes:
       # Wajib agar file video tidak hilang saat container di-rebuild
       - ./public/videos:/app/public/videos

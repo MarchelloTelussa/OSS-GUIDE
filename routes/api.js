@@ -1312,23 +1312,8 @@ router.delete('/guides/:id', requireAuth('ITAdmin'), async (req, res, next) => {
 // =============================================================
 
 router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
-    /* 
-        #swagger.tags = ['Uploads']
-        #swagger.summary = 'Upload File Video Panduan (Khusus ITAdmin)'
-        #swagger.description = 'Upload file video (Maks: 500MB). Disimpan dalam folder terstruktur berdasarkan Type & Title.'
-        #swagger.security = [{ "bearerAuth": [] }]
-        #swagger.consumes = ['multipart/form-data']
-        #swagger.parameters['video'] = {
-            in: 'formData',
-            type: 'file',
-            required: true,
-            description: 'File video (mp4, m4v, mov, webm, ogv, ogg)'
-        }
-        #swagger.parameters['groupId'] = { in: 'formData', type: 'string' }
-        #swagger.parameters['title'] = { in: 'formData', type: 'string' }
-        #swagger.responses[200] = { description: 'Video berhasil di-upload', schema: { videoPath: '/videos/web/title/123.mp4' } }
-        #swagger.responses[413] = { description: 'Ukuran file melebihi batas 500 MB' }
-    */
+    let tempFilepath = null; // Fixed scope so outer catch can access it
+
     try {
         const chunks = [];
         let received = 0;
@@ -1347,23 +1332,29 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
             chunks.push(chunk);
         });
 
+        req.on('error', (err) => {
+            chunks.length = 0;
+            next(err);
+        });
+
         req.on('end', async () => {
             if (tooLarge) return;
-            let tempFilepath = null;
 
             try {
-                const buffer = Buffer.concat(chunks);
-                chunks.length = 0; // Bebaskan RAM segera setelah concat
-
                 const contentType = req.headers['content-type'] || '';
                 if (!contentType.includes('multipart/form-data')) {
+                    chunks.length = 0;
                     return res.status(400).json({ error: 'Invalid content type' });
                 }
 
                 const boundaryMatch = contentType.match(/boundary=([^;]+)/);
                 if (!boundaryMatch) {
+                    chunks.length = 0;
                     return res.status(400).json({ error: 'Invalid boundary' });
                 }
+
+                const buffer = Buffer.concat(chunks);
+                chunks.length = 0; // Free chunk array immediately
 
                 const parsed = parseMultipartBuffer(buffer, boundaryMatch[1]);
                 const videoFile = parsed.files['video'] || Object.values(parsed.files)[0];
@@ -1396,24 +1387,53 @@ router.post('/upload-video', requireAuth('ITAdmin'), async (req, res, next) => {
                 const safeTitleFolder = sanitizeFolderName(titleParam);
                 const targetDir = path.join(__dirname, '../public/videos', safeTypeFolder, safeTitleFolder);
 
-                if (!fs.existsSync(targetDir)) {
-                    fs.mkdirSync(targetDir, { recursive: true });
-                }
+                await fs.promises.mkdir(targetDir, { recursive: true });
 
                 const timestamp = Date.now();
-                tempFilepath = path.join(targetDir, `raw_${timestamp}${extension}`);
-                const finalFilename = `${timestamp}.mp4`; // Selalu distandarisasi ke .mp4
+                const finalFilename = `${timestamp}.mp4`;
                 const finalFilepath = path.join(targetDir, finalFilename);
-
-                // Tulis file mentah sementara, kompres, lalu hapus file mentah
-                await fs.promises.writeFile(tempFilepath, videoFile.data);
-                await compressVideo(tempFilepath, finalFilepath);
-                await fs.promises.unlink(tempFilepath);
-                tempFilepath = null;
-
-                // Kembalikan URL dengan ekstensi .mp4 final agar tersimpan akurat di DB
                 const videoUrl = `/videos/${safeTypeFolder}/${safeTitleFolder}/${finalFilename}`;
-                return res.json({ videoPath: videoUrl });
+
+                // Check if already small MP4 (e.g., < 20MB) -> skip compression completely
+                const isAlreadySmallMp4 = extension === '.mp4' && videoFile.data.length < 20 * 1024 * 1024;
+
+                if (isAlreadySmallMp4) {
+                    await fs.promises.writeFile(finalFilepath, videoFile.data);
+                    return res.json({ videoPath: videoUrl });
+                }
+
+                // Write raw file first so user doesn't wait
+                tempFilepath = path.join(targetDir, `raw_${timestamp}${extension}`);
+                await fs.promises.writeFile(tempFilepath, videoFile.data);
+
+                // If original is MP4, copy to finalFilepath temporarily so link works immediately
+                if (extension === '.mp4') {
+                    await fs.promises.copyFile(tempFilepath, finalFilepath);
+                }
+
+                // 1. RESPOND IMMEDIATELY (Upload finishes in seconds, not minutes)
+                res.status(202).json({
+                    videoPath: videoUrl,
+                    processing: true,
+                    message: 'Video uploaded and compressing in background'
+                });
+
+                // 2. COMPRESS IN BACKGROUND (Do not await before res.json)
+                const rawPathToClean = tempFilepath;
+                const tempCompressedPath = path.join(targetDir, `comp_${timestamp}.mp4`);
+
+                compressVideo(rawPathToClean, tempCompressedPath)
+                    .then(async () => {
+                        // Replace finalFilepath with compressed version atomically
+                        await fs.promises.rename(tempCompressedPath, finalFilepath);
+                        await fs.promises.unlink(rawPathToClean).catch(() => {});
+                        console.log(`[VIDEO_COMPRESSED] ${videoUrl}`);
+                    })
+                    .catch(async (err) => {
+                        console.error('[BACKGROUND_COMPRESSION_ERROR]', err);
+                        await fs.promises.unlink(tempCompressedPath).catch(() => {});
+                        // Fallback: if original was mp4, keep it; otherwise rename raw if possible
+                    });
 
             } catch (error) {
                 if (tempFilepath && fs.existsSync(tempFilepath)) {

@@ -1159,7 +1159,7 @@ function renderTypeImage(imgUrl) {
 
     if (imgUrl) {
         elements.typeImageContainer.innerHTML = `
-            <img id="typeImgElement" src="${escapeHTML(imgUrl)}" alt="Type Image" onerror="this.onerror=null; this.src='./img/screenshot.png';">
+            <img id="typeImgElement" src="${escapeHTML(imgUrl)}" alt="Type Image" onerror="this.onerror=null; this.src='./img/x.png';">
         `;
 
         const imgElement = document.getElementById('typeImgElement');

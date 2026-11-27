@@ -6,7 +6,7 @@ export async function logActivity(req, action) {
         const userRole = req.user ? req.user.role : 'Guest';
         const method = req.method;
         const endpoint = req.originalUrl;
-        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const ipAddress = req.ip;
 
         await db.query(
             `INSERT INTO activity_logs (user_id, user_role, action, method, endpoint, ip_address) 
